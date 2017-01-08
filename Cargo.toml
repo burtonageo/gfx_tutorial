@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["georgeburton"]
 
 [dependencies]
+angular = "0.1"
 gfx = "0.13"
 gfx_window_glutin = "0.13"
 glutin = "0.7"
+nalgebra = "0.10"
