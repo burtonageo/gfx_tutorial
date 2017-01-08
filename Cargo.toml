@@ -1,0 +1,9 @@
+[package]
+name = "gfx_tutorial"
+version = "0.1.0"
+authors = ["georgeburton"]
+
+[dependencies]
+gfx = "0.13"
+gfx_window_glutin = "0.13"
+glutin = "0.7"
