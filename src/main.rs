@@ -6,11 +6,9 @@ extern crate glutin;
 extern crate nalgebra as na;
 
 use angular::Angle;
-
 use gfx::Device;
 use gfx::traits::FactoryExt;
-
-use na::{Isometry3, Perspective3, Point3, ToHomogeneous, Vector3};
+use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 
 gfx_defines! {
     vertex Vertex {
@@ -19,12 +17,12 @@ gfx_defines! {
     }
 
     constant Locals {
-        transform: [[f32; 4]; 4] = "vp_transform",
+        transform: [[f32; 4]; 4] = "mvp_transform",
     }
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
-        transform: gfx::Global<[[f32; 4]; 4]> = "vp_transform",
+        transform: gfx::Global<[[f32; 4]; 4]> = "mvp_transform",
         locals: gfx::ConstantBuffer<Locals> = "locals",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
     }
@@ -37,11 +35,11 @@ in vec3 position;
 in vec3 color;
 out vec4 v_color;
 
-uniform mat4 vp_transform;
+uniform mat4 mvp_transform;
 
 void main() {
     v_color = vec4(color, 1.0);
-    gl_Position = vp_transform * vec4(position, 1.0);
+    gl_Position = mvp_transform * vec4(position, 1.0);
     gl_ClipDistance[0] = 1.0;
 }
 "#;
@@ -108,21 +106,32 @@ fn main() {
     let (window, mut device, mut factory, main_color, _) =
         gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::DepthStencil>(builder);
 
-    let aspect = window.get_inner_size_pixels().map(|(w, h)| w as f32 / h as f32).unwrap_or(1.0f32);
-    let projection = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0);
-    let view = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y());
+    let projection = {
+        let aspect = window.get_inner_size_pixels().map(|(w, h)| w as f32 / h as f32).unwrap_or(1.0f32);
+        Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix()
+    };
+    let view = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
+        .to_homogeneous();
 
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
     let pso = factory.create_pipeline_simple(VERT_SRC.as_bytes(), FRAG_SRC.as_bytes(), pipe::new()).unwrap();
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(CUBE, ());
-    let data = pipe::Data {
-        vbuf: vertex_buffer,
-        transform: *(projection.to_matrix() * view.to_homogeneous()).as_ref(),
-        locals: factory.create_constant_buffer(1),
-        out: main_color
-    };
 
+    let mut rot = Rotation3::new(na::zero());
     'main: loop {
+        let model = {
+            let angle = Angle::Degrees(1).normalized();
+            rot = na::append_rotation(&rot, &Vector3::new(0.0, angle.in_degrees() as f32 / 100.0, 0.0));
+            rot.to_homogeneous()
+        };
+
+        let data = pipe::Data {
+            vbuf: vertex_buffer.clone(),
+            transform: *(projection * view * model).as_ref(),
+            locals: factory.create_constant_buffer(1),
+            out: main_color.clone()
+        };
+
         for e in window.poll_events() {
             match e {
                 glutin::Event::Closed => break 'main,
