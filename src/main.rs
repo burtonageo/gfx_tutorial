@@ -128,10 +128,8 @@ fn main() {
 
     let mut rot = Rotation3::new(na::zero());
     'main: loop {
-        let model = {
-            rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(0.5).in_radians(), 0.0));
-            rot.to_homogeneous()
-        };
+        rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(0.5).in_radians(), 0.0));
+        let model = rot.to_homogeneous();
 
         let data = pipe::Data {
             vbuf: vertex_buffer.clone(),
