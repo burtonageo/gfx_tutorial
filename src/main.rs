@@ -106,12 +106,13 @@ fn main() {
     let (window, mut device, mut factory, main_color, _) =
         gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::DepthStencil>(builder);
 
-    let projection = {
+    let view_projection = {
         let aspect = window.get_inner_size_pixels().map(|(w, h)| w as f32 / h as f32).unwrap_or(1.0f32);
-        Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix()
+        let p = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
+        let v = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
+            .to_homogeneous();
+        p * v
     };
-    let view = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
-        .to_homogeneous();
 
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
     let shaders = {
@@ -135,7 +136,7 @@ fn main() {
 
         let data = pipe::Data {
             vbuf: vertex_buffer.clone(),
-            transform: *(projection * view * model).as_ref(),
+            transform: *(view_projection * model).as_ref(),
             locals: factory.create_constant_buffer(1),
             out: main_color.clone()
         };
