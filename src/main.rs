@@ -103,8 +103,10 @@ fn main() {
         .with_decorations(false)
         .with_vsync();
 
-    let (window, mut device, mut factory, main_color, _) =
+    let (mut window, mut device, mut factory, main_color, _) =
         gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::DepthStencil>(builder);
+
+    window.set_window_resize_callback(Some(resize_cbk));
 
     let view_projection = {
         let aspect = window.get_inner_size_pixels().map(|(w, h)| w as f32 / h as f32).unwrap_or(1.0f32);
@@ -151,4 +153,7 @@ fn main() {
         window.swap_buffers().unwrap();
         device.cleanup();
     }
+}
+
+fn resize_cbk(w: u32, h: u32){
 }
