@@ -129,8 +129,7 @@ fn main() {
     let mut rot = Rotation3::new(na::zero());
     'main: loop {
         let model = {
-            let angle = Angle::Degrees(1).normalized();
-            rot = na::append_rotation(&rot, &Vector3::new(0.0, angle.in_degrees() as f32 / 100.0, 0.0));
+            rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(0.5).in_radians(), 0.0));
             rot.to_homogeneous()
         };
 
