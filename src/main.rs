@@ -25,7 +25,6 @@ gfx_defines! {
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
-        transform: gfx::Global<[[f32; 4]; 4]> = "mvp_transform",
         locals: gfx::ConstantBuffer<Locals> = "locals",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
     }
@@ -38,7 +37,9 @@ in vec3 position;
 in vec3 color;
 out vec4 v_color;
 
-uniform mat4 mvp_transform;
+layout (std140) uniform locals {
+    mat4 mvp_transform;
+};
 
 void main() {
     v_color = vec4(color, 1.0);
@@ -130,6 +131,11 @@ fn main() {
                                             gfx::state::Rasterizer::new_fill().with_cull_back(),
                                             pipe::new()).unwrap();
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(CUBE, ());
+    let data = pipe::Data {
+        vbuf: vertex_buffer,
+        locals: factory.create_constant_buffer(1),
+        out: main_color
+    };
 
     let mut rot = Rotation3::new(na::zero());
     'main: loop {
@@ -137,13 +143,6 @@ fn main() {
 
         rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(0.5).in_radians(), 0.0));
         let model = rot.to_homogeneous();
-
-        let data = pipe::Data {
-            vbuf: vertex_buffer.clone(),
-            transform: *(view_projection * model).as_ref(),
-            locals: factory.create_constant_buffer(1),
-            out: main_color.clone()
-        };
 
         for e in window.poll_events() {
             match e {
@@ -153,6 +152,10 @@ fn main() {
         }
 
         encoder.clear(&data.out, CLEAR_COLOR);
+        encoder.update_constant_buffer(&data.locals,
+                                       &Locals {
+                                           transform: *(view_projection * model).as_ref()
+                                       });
         encoder.draw(&slice, &pso, &data);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
