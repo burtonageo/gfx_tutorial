@@ -161,13 +161,8 @@ fn main() {
         window.swap_buffers().unwrap();
         device.cleanup();
 
-        let end = Instant::now();
-        let dt = end.duration_since(start);
-
-        let standard_fps = Duration::from_millis(16);
-        let dt = standard_fps.checked_sub(dt).unwrap_or(standard_fps);
-
-        std::thread::sleep(dt);
+        let dt = Instant::now().duration_since(start);
+        std::thread::sleep(Duration::from_millis(16).checked_sub(dt).unwrap_or(Duration::new(0, 0)));
     }
 }
 
