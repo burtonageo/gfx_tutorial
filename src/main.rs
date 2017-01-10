@@ -166,5 +166,5 @@ fn main() {
     }
 }
 
-fn resize_cbk(w: u32, h: u32){
+fn resize_cbk(_w: u32, _h: u32){
 }
