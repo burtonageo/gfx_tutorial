@@ -1,3 +1,5 @@
+#![feature(duration_checked_ops)]
+
 extern crate angular;
 #[macro_use]
 extern crate gfx;
@@ -9,6 +11,7 @@ use angular::Angle;
 use gfx::{Device, Factory};
 use gfx::traits::FactoryExt;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
+use std::time::{Duration, Instant};
 
 gfx_defines! {
     vertex Vertex {
@@ -130,6 +133,8 @@ fn main() {
 
     let mut rot = Rotation3::new(na::zero());
     'main: loop {
+        let start = Instant::now();
+
         rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(0.5).in_radians(), 0.0));
         let model = rot.to_homogeneous();
 
@@ -152,6 +157,14 @@ fn main() {
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
+
+        let end = Instant::now();
+        let dt = end.duration_since(start);
+
+        let standard_fps = Duration::from_millis(16);
+        let dt = standard_fps.checked_sub(dt).unwrap_or(standard_fps);
+
+        std::thread::sleep(dt);
     }
 }
 
