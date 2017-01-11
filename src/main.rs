@@ -121,7 +121,7 @@ fn main() {
     window.set_window_resize_callback(Some(resize_cbk));
 
     unsafe {
-        let aspect = window.get_inner_size_pixels().map(|(w, h)| w as f32 / h as f32).unwrap_or(1.0f32);
+        let aspect = window.get_inner_size_pixels().map(|(w, h)| aspect(w, h)).unwrap_or(1.0f32);
         PROJECTION = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
     }
     let view = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
@@ -176,9 +176,12 @@ fn main() {
     }
 }
 
+fn aspect(w: u32, h: u32) -> f32 {
+    w as f32 / h as f32
+}
+
 fn resize_cbk(w: u32, h: u32){
     unsafe {
-        let aspect = w as f32 / h as f32;
-        PROJECTION = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
+        PROJECTION = Perspective3::new(aspect(w, h), Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
     }
 }
