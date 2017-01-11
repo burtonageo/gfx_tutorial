@@ -10,7 +10,7 @@ extern crate nalgebra as na;
 use angular::Angle;
 use gfx::{Device, Factory};
 use gfx::traits::FactoryExt;
-use na::{Isometry3, Matrix4, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
+use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use std::time::{Duration, Instant};
 
 gfx_defines! {
@@ -100,14 +100,6 @@ const CUBE: &'static [Vertex] = &[
 
 const CLEAR_COLOR: [f32; 4] = [0.005, 0.005, 0.1, 1.0];
 
-// TODO(GAB): somehow make this local/not static
-static mut PROJECTION: Matrix4<f32> = Matrix4 {
-    m11: 0.0, m21: 0.0, m31: 0.0, m41: 0.0,
-    m12: 0.0, m22: 0.0, m32: 0.0, m42: 0.0,
-    m13: 0.0, m23: 0.0, m33: 0.0, m43: 0.0,
-    m14: 0.0, m24: 0.0, m34: 0.0, m44: 0.0
-};
-
 fn main() {
     let builder = glutin::WindowBuilder::new()
         .with_title("Gfx Example")
@@ -115,15 +107,13 @@ fn main() {
         .with_decorations(false)
         .with_vsync();
 
-    let (mut window, mut device, mut factory, main_color, _) =
+    let (window, mut device, mut factory, main_color, _) =
         gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::DepthStencil>(builder);
 
-    window.set_window_resize_callback(Some(resize_cbk));
-
-    unsafe {
+    let mut projection = {
         let aspect = window.get_inner_size_pixels().map(|(w, h)| aspect(w, h)).unwrap_or(1.0f32);
-        PROJECTION = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
-    }
+        Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix()
+    };
     let view = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
         .to_homogeneous();
 
@@ -154,16 +144,20 @@ fn main() {
         for e in window.poll_events() {
             match e {
                 glutin::Event::Closed => break 'main,
+                glutin::Event::Resized(w, h) => {
+                    // TODO(GAB): This doesn't work on MacOS
+                    projection = Perspective3::new(aspect(w, h), Angle::eighth().in_radians(), 0.1, 100.0)
+                        .to_matrix();
+                }
                 _ => (),
             }
         }
 
         encoder.clear(&data.out, CLEAR_COLOR);
 
-        let mvp = unsafe { PROJECTION * view * model };
         encoder.update_constant_buffer(&data.locals,
                                        &Locals {
-                                           transform: *(mvp).as_ref()
+                                           transform: *(projection * view * model).as_ref()
                                        });
 
         encoder.draw(&slice, &pso, &data);
@@ -178,10 +172,4 @@ fn main() {
 
 fn aspect(w: u32, h: u32) -> f32 {
     w as f32 / h as f32
-}
-
-fn resize_cbk(w: u32, h: u32){
-    unsafe {
-        PROJECTION = Perspective3::new(aspect(w, h), Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
-    }
 }
