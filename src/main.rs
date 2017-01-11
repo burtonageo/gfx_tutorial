@@ -10,7 +10,7 @@ extern crate nalgebra as na;
 use angular::Angle;
 use gfx::{Device, Factory};
 use gfx::traits::FactoryExt;
-use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
+use na::{Isometry3, Matrix4, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use std::time::{Duration, Instant};
 
 gfx_defines! {
@@ -100,6 +100,14 @@ const CUBE: &'static [Vertex] = &[
 
 const CLEAR_COLOR: [f32; 4] = [0.005, 0.005, 0.1, 1.0];
 
+// TODO(GAB): somehow make this local/not static
+static mut PROJECTION: Matrix4<f32> = Matrix4 {
+    m11: 0.0, m21: 0.0, m31: 0.0, m41: 0.0,
+    m12: 0.0, m22: 0.0, m32: 0.0, m42: 0.0,
+    m13: 0.0, m23: 0.0, m33: 0.0, m43: 0.0,
+    m14: 0.0, m24: 0.0, m34: 0.0, m44: 0.0
+};
+
 fn main() {
     let builder = glutin::WindowBuilder::new()
         .with_title("Gfx Example")
@@ -112,13 +120,12 @@ fn main() {
 
     window.set_window_resize_callback(Some(resize_cbk));
 
-    let view_projection = {
+    unsafe {
         let aspect = window.get_inner_size_pixels().map(|(w, h)| w as f32 / h as f32).unwrap_or(1.0f32);
-        let p = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
-        let v = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
-            .to_homogeneous();
-        p * v
-    };
+        PROJECTION = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
+    }
+    let view = Isometry3::look_at_rh(&Point3::new(4.0f32, 3.0, 3.0), &na::origin(), &Vector3::y())
+        .to_homogeneous();
 
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
     let shaders = {
@@ -141,7 +148,7 @@ fn main() {
     'main: loop {
         let start = Instant::now();
 
-        rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(0.5).in_radians(), 0.0));
+        rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(1.0).in_radians(), 0.0));
         let model = rot.to_homogeneous();
 
         for e in window.poll_events() {
@@ -152,10 +159,13 @@ fn main() {
         }
 
         encoder.clear(&data.out, CLEAR_COLOR);
+
+        let mvp = unsafe { PROJECTION * view * model };
         encoder.update_constant_buffer(&data.locals,
                                        &Locals {
-                                           transform: *(view_projection * model).as_ref()
+                                           transform: *(mvp).as_ref()
                                        });
+
         encoder.draw(&slice, &pso, &data);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
@@ -166,5 +176,9 @@ fn main() {
     }
 }
 
-fn resize_cbk(_w: u32, _h: u32){
+fn resize_cbk(w: u32, h: u32){
+    unsafe {
+        let aspect = w as f32 / h as f32;
+        PROJECTION = Perspective3::new(aspect, Angle::eighth().in_radians(), 0.1, 100.0).to_matrix();
+    }
 }
