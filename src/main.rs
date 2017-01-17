@@ -200,7 +200,7 @@ fn main() {
                     let (ww, wh) = (ww as i32, wh as i32);
 
                     iput.horizontal_angle += Angle::Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
-                    iput.vertical_angle += Angle::Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
+                    iput.vertical_angle -= Angle::Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
 
                     iput.horizontal_angle = iput.horizontal_angle.normalized();
                     iput.vertical_angle = iput.vertical_angle.normalized();
