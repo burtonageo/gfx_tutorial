@@ -4,8 +4,10 @@ version = "0.1.0"
 authors = ["georgeburton"]
 
 [dependencies]
-angular = "0.1"
+angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
 gfx = "0.13"
 gfx_window_glutin = "0.13"
 glutin = "0.7"
 nalgebra = "0.10"
+num = "0.1"
+time = "0.1"
