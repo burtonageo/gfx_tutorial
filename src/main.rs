@@ -9,7 +9,7 @@ extern crate nalgebra as na;
 extern crate scopeguard;
 extern crate time;
 
-use angular::Angle;
+use angular::{Angle, Degrees};
 use gfx::{Device, Factory};
 use gfx::traits::FactoryExt;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
@@ -170,6 +170,7 @@ fn main() {
     let mut rot = Rotation3::new(na::zero());
     let mut last = PreciseTime::now();
     let mut is_paused = false;
+
     'main: loop {
         let current = PreciseTime::now();
         let dt = last.to(current);
@@ -223,8 +224,8 @@ fn main() {
                 Event::MouseMoved(x, y) => {
                     let (ww, wh) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
 
-                    iput.horizontal_angle += Angle::Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
-                    iput.vertical_angle -= Angle::Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
+                    iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
+                    iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
 
                     iput.horizontal_angle = iput.horizontal_angle.normalized();
                     iput.vertical_angle = iput.vertical_angle.normalized();
@@ -263,7 +264,7 @@ fn main() {
             continue;
         }
 
-        rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(25.0 * dt_s).in_radians(), 0.0));
+        rot = na::append_rotation(&rot, &Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
 
         let view = {
             let up = na::cross(&right, &direction);
