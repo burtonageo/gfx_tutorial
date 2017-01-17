@@ -5,6 +5,8 @@ extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate num;
 extern crate nalgebra as na;
+#[macro_use]
+extern crate scopeguard;
 extern crate time;
 
 use angular::Angle;
@@ -167,13 +169,21 @@ fn main() {
 
     let mut rot = Rotation3::new(na::zero());
     let mut last = PreciseTime::now();
+    let mut is_paused = false;
     'main: loop {
         let current = PreciseTime::now();
         let dt = last.to(current);
         let dt_s = dt.num_nanoseconds().unwrap_or(0) as f32 / 1_000_000_000.0f32;
         last = current;
 
-        rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(25.0 * dt_s).in_radians(), 0.0));
+        defer!({
+            let sleep_time = Duration::milliseconds(12)
+                .checked_sub(&dt)
+                .unwrap_or(Duration::zero())
+                .to_std()
+                .unwrap_or(StdDuration::from_millis(0));
+            std::thread::sleep(sleep_time);
+        });
 
         let direction = Vector3 {
             x: iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
@@ -227,11 +237,19 @@ fn main() {
                     iput.fov = (iput.fov + Angle::Degrees(dy / 5.0)).normalized();
                     projection.set_fovy(iput.fov.in_radians());
                 }
-                Event::Focused(_gained) => {
+                Event::Focused(gained) => {
+                    is_paused = !gained;
+                    continue;
                 }
                 _ => (),
             }
         }
+
+        if is_paused {
+            continue;
+        }
+
+        rot = na::append_rotation(&rot, &Vector3::new(0.0, Angle::Degrees(25.0 * dt_s).in_radians(), 0.0));
 
         let view = {
             let up = na::cross(&right, &direction);
@@ -252,13 +270,6 @@ fn main() {
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
-
-        let sleep_time = Duration::milliseconds(12)
-            .checked_sub(&dt)
-            .unwrap_or(Duration::zero())
-            .to_std()
-            .unwrap_or(StdDuration::from_millis(0));
-        std::thread::sleep(sleep_time);
     }
 }
 
