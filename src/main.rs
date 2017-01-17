@@ -125,7 +125,7 @@ impl Input {
 
 const SPEED: f32 = 19.0;
 const MOUSE_SPEED: f32 = 7.0;
-const DEFAULT_WIN_SIZE: (u32, u32) = (1024, 768);
+const DEFAULT_WIN_SIZE: (i32, i32) = (1024, 768);
 
 fn main() {
     let builder = glutin::WindowBuilder::new()
@@ -197,17 +197,31 @@ fn main() {
             z: (iput.horizontal_angle - Angle::quarter()).cos()
         };
 
+        // Hack to get around lack of resize event on MacOS
+        // https://github.com/tomaka/winit/issues/39
+        if cfg!(target_os = "macos") {
+            static mut WINDOW_LAST_W: i32 = 0;
+            static mut WINDOW_LAST_H: i32 = 0;
+            let (w, h) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
+            unsafe {
+                if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
+                    projection.set_aspect(aspect(w as u32, h as u32));
+                    WINDOW_LAST_W = w;
+                    WINDOW_LAST_H = h;
+                }
+            }
+        }
+
         for e in window.poll_events() {
             use glutin::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
             match e {
                 Event::Closed | Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
+                #[cfg(not(target_os = "macos"))]
                 Event::Resized(w, h) => {
-                    // TODO(GAB): This doesn't work on MacOS
                     projection.set_aspect(aspect(w, h));
                 }
                 Event::MouseMoved(x, y) => {
-                    let (ww, wh) = window.get_inner_size().unwrap_or(DEFAULT_WIN_SIZE);
-                    let (ww, wh) = (ww as i32, wh as i32);
+                    let (ww, wh) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
 
                     iput.horizontal_angle += Angle::Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
                     iput.vertical_angle -= Angle::Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
@@ -273,8 +287,12 @@ fn main() {
     }
 }
 
+fn u32pair_toi32pair((x, y): (u32, u32)) -> (i32, i32) {
+    (x as i32, y as i32)
+}
+
 fn center_cursor_to_window(window: &glutin::Window) -> Result<(), ()> {
-    let (ww, wh) = window.get_inner_size().unwrap_or(DEFAULT_WIN_SIZE);
+    let (ww, wh) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
     window.set_cursor_position(ww as i32 / 2, wh as i32 / 2)
 }
 
