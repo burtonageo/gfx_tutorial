@@ -5,8 +5,8 @@ authors = ["georgeburton"]
 
 [dependencies]
 angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
-gfx = "0.13"
-gfx_window_glutin = "0.13"
+gfx = "0.14"
+gfx_window_glutin = "0.14"
 glutin = "0.7"
 nalgebra = "0.10"
 num = "0.1"
