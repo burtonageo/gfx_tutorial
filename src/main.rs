@@ -10,7 +10,7 @@ extern crate scopeguard;
 extern crate time;
 
 use angular::{Angle, Degrees};
-use gfx::{Device, Factory};
+use gfx::Device;
 use gfx::traits::FactoryExt;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
@@ -151,15 +151,11 @@ fn main() {
     };
 
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
-    let shaders = {
-        let vert_shader = factory.create_shader_vertex(VERT_SRC.as_bytes()).unwrap();
-        let frag_shader = factory.create_shader_pixel(FRAG_SRC.as_bytes()).unwrap();
-        gfx::ShaderSet::Simple(vert_shader, frag_shader)
-    };
-    let pso = factory.create_pipeline_state(&shaders,
-                                            gfx::Primitive::TriangleList,
-                                            gfx::state::Rasterizer::new_fill().with_cull_back(),
-                                            pipe::new()).unwrap();
+    let program = factory.link_program(VERT_SRC.as_bytes(),FRAG_SRC.as_bytes()).unwrap();
+    let pso = factory.create_pipeline_from_program(&program,
+                                                   gfx::Primitive::TriangleList,
+                                                   gfx::state::Rasterizer::new_fill().with_cull_back(),
+                                                   pipe::new()).unwrap();
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(CUBE, ());
     let data = pipe::Data {
         vbuf: vertex_buffer,
