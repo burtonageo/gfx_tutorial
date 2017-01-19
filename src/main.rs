@@ -8,6 +8,7 @@ extern crate nalgebra as na;
 #[macro_use]
 extern crate scopeguard;
 extern crate time;
+extern crate wavefront_obj;
 
 use angular::{Angle, Degrees};
 use gfx::Device;
@@ -15,7 +16,10 @@ use gfx::traits::FactoryExt;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
 use time::{Duration, PreciseTime};
+use std::fs::File;
+use std::io::Read;
 use std::time::Duration as StdDuration;
+use wavefront_obj::obj;
 
 gfx_defines! {
     vertex Vertex {
@@ -34,74 +38,17 @@ gfx_defines! {
     }
 }
 
-const VERT_SRC: &'static str = r#"
-#version 150 core
-
-in vec3 position;
-in vec3 color;
-out vec4 v_color;
-
-layout (std140) uniform locals {
-    mat4 mvp_transform;
-};
-
-void main() {
-    v_color = vec4(color, 1.0);
-    gl_Position = mvp_transform * vec4(position, 1.0);
-    gl_ClipDistance[0] = 1.0;
+impl<'a> From<&'a obj::Vertex> for Vertex {
+    fn from(v: &'a obj::Vertex) -> Self {
+        Vertex {
+            pos: [v.x as f32, v.y as f32, v.z as f32],
+            col: [0.3f32, 0.3, 0.3],
+        }
+    }
 }
-"#;
 
-const FRAG_SRC: &'static str = r#"
-#version 150 core
-
-in vec4 v_color;
-out vec4 Target0;
-
-void main() {
-    Target0 = v_color;
-}
-"#;
-
-const CUBE: &'static [Vertex] = &[
-    Vertex { pos: [-1.0, -1.0, -1.0], col: [0.583, 0.771, 0.014] },
-    Vertex { pos: [-1.0, -1.0,  1.0], col: [0.609, 0.115, 0.436] },
-    Vertex { pos: [-1.0,  1.0,  1.0], col: [0.327, 0.483, 0.844] },
-    Vertex { pos: [ 1.0,  1.0, -1.0], col: [0.822, 0.569, 0.201] },
-    Vertex { pos: [-1.0, -1.0, -1.0], col: [0.435, 0.602, 0.223] },
-    Vertex { pos: [-1.0,  1.0, -1.0], col: [0.310, 0.747, 0.185] },
-    Vertex { pos: [ 1.0, -1.0,  1.0], col: [0.597, 0.770, 0.761] },
-    Vertex { pos: [-1.0, -1.0, -1.0], col: [0.559, 0.436, 0.730] },
-    Vertex { pos: [ 1.0, -1.0, -1.0], col: [0.359, 0.583, 0.152] },
-    Vertex { pos: [ 1.0,  1.0, -1.0], col: [0.483, 0.596, 0.789] },
-    Vertex { pos: [ 1.0, -1.0, -1.0], col: [0.559, 0.861, 0.639] },
-    Vertex { pos: [-1.0, -1.0, -1.0], col: [0.195, 0.548, 0.859] },
-    Vertex { pos: [-1.0, -1.0, -1.0], col: [0.014, 0.184, 0.576] },
-    Vertex { pos: [-1.0,  1.0,  1.0], col: [0.771, 0.328, 0.970] },
-    Vertex { pos: [-1.0,  1.0, -1.0], col: [0.406, 0.615, 0.116] },
-    Vertex { pos: [ 1.0, -1.0,  1.0], col: [0.676, 0.977, 0.133] },
-    Vertex { pos: [-1.0, -1.0,  1.0], col: [0.971, 0.572, 0.833] },
-    Vertex { pos: [-1.0, -1.0, -1.0], col: [0.140, 0.616, 0.489] },
-    Vertex { pos: [-1.0,  1.0,  1.0], col: [0.997, 0.513, 0.064] },
-    Vertex { pos: [-1.0, -1.0,  1.0], col: [0.945, 0.719, 0.592] },
-    Vertex { pos: [ 1.0, -1.0,  1.0], col: [0.543, 0.021, 0.978] },
-    Vertex { pos: [ 1.0,  1.0,  1.0], col: [0.279, 0.317, 0.505] },
-    Vertex { pos: [ 1.0, -1.0, -1.0], col: [0.167, 0.620, 0.077] },
-    Vertex { pos: [ 1.0,  1.0, -1.0], col: [0.347, 0.857, 0.137] },
-    Vertex { pos: [ 1.0, -1.0, -1.0], col: [0.055, 0.953, 0.042] },
-    Vertex { pos: [ 1.0,  1.0,  1.0], col: [0.714, 0.505, 0.345] },
-    Vertex { pos: [ 1.0, -1.0,  1.0], col: [0.783, 0.290, 0.734] },
-    Vertex { pos: [ 1.0,  1.0,  1.0], col: [0.722, 0.645, 0.174] },
-    Vertex { pos: [ 1.0,  1.0, -1.0], col: [0.302, 0.455, 0.848] },
-    Vertex { pos: [-1.0,  1.0, -1.0], col: [0.225, 0.587, 0.040] },
-    Vertex { pos: [ 1.0,  1.0,  1.0], col: [0.517, 0.713, 0.338] },
-    Vertex { pos: [-1.0,  1.0, -1.0], col: [0.053, 0.959, 0.120] },
-    Vertex { pos: [-1.0,  1.0,  1.0], col: [0.393, 0.621, 0.362] },
-    Vertex { pos: [ 1.0,  1.0,  1.0], col: [0.673, 0.211, 0.457] },
-    Vertex { pos: [-1.0,  1.0,  1.0], col: [0.820, 0.883, 0.371] },
-    Vertex { pos: [ 1.0, -1.0,  1.0], col: [0.982, 0.099, 0.879] }
-];
-
+const VERT_SRC: &'static [u8] = include_bytes!("../data/shader/standard.vs");
+const FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/standard.fs");
 const CLEAR_COLOR: [f32; 4] = [0.005, 0.005, 0.1, 1.0];
 
 #[derive(Debug)]
@@ -137,26 +84,19 @@ fn main() {
     let (window, mut device, mut factory, main_color, _) =
         gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::DepthStencil>(builder);
 
-    {
-        window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
-        window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
-        center_cursor_to_window(&window).expect("Could not set cursor position");
-    }
-
-    let mut iput = Input::new();
-
-    let mut projection = {
-        let aspect = window.get_inner_size_pixels().map(|(w, h)| aspect(w, h)).unwrap_or(1.0f32);
-        Perspective3::new(aspect, iput.fov.in_radians(), 0.1, 100.0)
-    };
+    window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
+    window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
+    window.center_cursor().expect("Could not set cursor position");
 
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
-    let program = factory.link_program(VERT_SRC.as_bytes(),FRAG_SRC.as_bytes()).unwrap();
+    let program = factory.link_program(VERT_SRC, FRAG_SRC).unwrap();
     let pso = factory.create_pipeline_from_program(&program,
                                                    gfx::Primitive::TriangleList,
                                                    gfx::state::Rasterizer::new_fill().with_cull_back(),
                                                    pipe::new()).unwrap();
-    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(CUBE, ());
+
+    let (verts, inds) = load_obj();
+    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let data = pipe::Data {
         vbuf: vertex_buffer,
         locals: factory.create_constant_buffer(1),
@@ -164,6 +104,8 @@ fn main() {
     };
 
     let mut rot = Rotation3::new(na::zero());
+    let mut iput = Input::new();
+    let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
 
@@ -199,10 +141,10 @@ fn main() {
         if cfg!(target_os = "macos") {
             static mut WINDOW_LAST_W: i32 = 0;
             static mut WINDOW_LAST_H: i32 = 0;
-            let (w, h) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
+            let (w, h) = window.get_size_signed_or_default();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    projection.set_aspect(aspect(w as u32, h as u32));
+                    projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
                 }
@@ -218,7 +160,7 @@ fn main() {
                     projection.set_aspect(aspect(w, h));
                 }
                 Event::MouseMoved(x, y) => {
-                    let (ww, wh) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
+                    let (ww, wh) = window.get_size_signed_or_default();
 
                     iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
                     iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
@@ -226,7 +168,7 @@ fn main() {
                     iput.horizontal_angle = iput.horizontal_angle.normalized();
                     iput.vertical_angle = iput.vertical_angle.normalized();
 
-                    center_cursor_to_window(&window).expect("Could not set cursor position");
+                    window.center_cursor().expect("Could not set cursor position");
                 }
                 Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Up)) => {
                     iput.position -= direction * SPEED * dt_s;
@@ -284,15 +226,63 @@ fn main() {
     }
 }
 
-fn u32pair_toi32pair((x, y): (u32, u32)) -> (i32, i32) {
-    (x as i32, y as i32)
+fn load_obj() -> (Vec<Vertex>, Vec<u16>) {
+    let mut obj_string  = String::new();
+    let mut obj_file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/data/mesh/suzanne.obj"))
+        .expect("Could not open suzanne.obj");
+    obj_file.read_to_string(&mut obj_string).expect("Could not read suzanne.obj");
+    drop(obj_file);
+
+    let obj = obj::parse(obj_string).expect("Could not parse suzanne.obj");
+
+    let mut vertices = Vec::new();
+    let object = obj.objects.get(0).expect("No objects");
+    for v in &object.vertices {
+        vertices.push(v.into());
+    }
+
+    let mut indices = Vec::new();
+    for g in &object.geometry {
+        use wavefront_obj::obj::Primitive;
+        for s in &g.shapes {
+            match s.primitive {
+                Primitive::Point(_) => unimplemented!(),
+                Primitive::Line(..) => unimplemented!(),
+                Primitive::Triangle(i0, i1, i2) => {
+                    let (vi0, _, _) = i0;
+                    let (vi1, _, _) = i1;
+                    let (vi2, _, _) = i2;
+                    indices.push(vi0 as u16);
+                    indices.push(vi1 as u16);
+                    indices.push(vi2 as u16);
+                }
+            }
+        }
+    }
+
+    (vertices, indices)
 }
 
-fn center_cursor_to_window(window: &glutin::Window) -> Result<(), ()> {
-    let (ww, wh) = window.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE);
-    window.set_cursor_position(ww as i32 / 2, wh as i32 / 2)
+trait WindowExt {
+    fn center_cursor(&self) -> Result<(), ()>;
+    fn get_size_signed_or_default(&self) -> (i32, i32);
+    fn aspect(&self) -> f32 {
+        let (w, h) = self.get_size_signed_or_default();
+        w as f32 / h as f32
+    }
 }
 
-fn aspect(w: u32, h: u32) -> f32 {
-    w as f32 / h as f32
+impl WindowExt for glutin::Window {
+    fn center_cursor(&self) -> Result<(), ()> {
+        let (ww, wh) = self.get_size_signed_or_default();
+        self.set_cursor_position(ww as i32 / 2, wh as i32 / 2)
+    }
+
+    fn get_size_signed_or_default(&self) -> (i32, i32) {
+        fn u32pair_toi32pair((x, y): (u32, u32)) -> (i32, i32) {
+            (x as i32, y as i32)
+        }
+
+        self.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE)
+    }
 }
