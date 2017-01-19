@@ -3,6 +3,13 @@ name = "gfx_tutorial"
 version = "0.1.0"
 authors = ["georgeburton"]
 
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+
 [dependencies]
 angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
 gfx = "0.14"
