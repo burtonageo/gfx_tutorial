@@ -25,6 +25,7 @@ gfx_defines! {
     vertex Vertex {
         pos: [f32; 3] = "position",
         col: [f32; 3] = "color",
+        normal: [f32; 3] = "normal",
     }
 
     constant Locals {
@@ -38,11 +39,12 @@ gfx_defines! {
     }
 }
 
-impl<'a> From<&'a obj::Vertex> for Vertex {
-    fn from(v: &'a obj::Vertex) -> Self {
+impl<'a> From<(&'a obj::Vertex, &'a obj::Normal)> for Vertex {
+    fn from((v, n): (&'a obj::Vertex, &'a obj::Normal)) -> Self {
         Vertex {
             pos: [v.x as f32, v.y as f32, v.z as f32],
             col: [0.3f32, 0.3, 0.3],
+            normal: [n.x as f32, n.y as f32, n.z as f32],
         }
     }
 }
@@ -132,7 +134,7 @@ fn main() {
 
         let right = Vector3 {
             x: (iput.horizontal_angle - Angle::quarter()).sin(),
-            y: 0.0,
+            y: na::zero(),
             z: (iput.horizontal_angle - Angle::quarter()).cos()
         };
 
@@ -227,6 +229,7 @@ fn main() {
 }
 
 fn load_obj() -> (Vec<Vertex>, Vec<u16>) {
+    use wavefront_obj::obj::Primitive;
     let mut obj_string  = String::new();
     let mut obj_file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/data/mesh/suzanne.obj"))
         .expect("Could not open suzanne.obj");
@@ -234,31 +237,18 @@ fn load_obj() -> (Vec<Vertex>, Vec<u16>) {
     drop(obj_file);
 
     let obj = obj::parse(obj_string).expect("Could not parse suzanne.obj");
-
-    let mut vertices = Vec::new();
     let object = obj.objects.get(0).expect("No objects");
-    for v in &object.vertices {
-        vertices.push(v.into());
-    }
 
-    let mut indices = Vec::new();
-    for g in &object.geometry {
-        use wavefront_obj::obj::Primitive;
-        for s in &g.shapes {
-            match s.primitive {
-                Primitive::Point(_) => unimplemented!(),
-                Primitive::Line(..) => unimplemented!(),
-                Primitive::Triangle(i0, i1, i2) => {
-                    let (vi0, _, _) = i0;
-                    let (vi1, _, _) = i1;
-                    let (vi2, _, _) = i2;
-                    indices.push(vi0 as u16);
-                    indices.push(vi1 as u16);
-                    indices.push(vi2 as u16);
-                }
+    let vertices = object.vertices.iter().zip(&object.normals).map(Vertex::from).collect();
+    let indices = object.geometry.iter().flat_map(|g| g.shapes.iter()).flat_map(|s|
+        match s.primitive {
+            Primitive::Triangle(i0, i1, i2) => {
+                use std::iter::once as o;
+                o(i0.0 as u16).chain(o(i1.0 as u16)).chain(o(i2.0 as u16))
             }
-        }
-    }
+            _ => unimplemented!(),
+        })
+        .collect();
 
     (vertices, indices)
 }
