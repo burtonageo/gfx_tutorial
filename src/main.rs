@@ -30,6 +30,11 @@ gfx_defines! {
 
     constant Locals {
         transform: [[f32; 4]; 4] = "mvp_transform",
+        model: [[f32; 4]; 4] = "model_transform",
+        view: [[f32; 4]; 4] = "view_transform",
+        light_col: [f32; 4] = "light_color",
+        light_pos: [f32; 3] = "light_position",
+        light_pow: f32 = "light_power",
     }
 
     pipeline pipe {
@@ -215,10 +220,17 @@ fn main() {
 
         encoder.clear(&data.out, CLEAR_COLOR);
 
-        let mvp = projection.to_matrix() * view.to_homogeneous() * rot.to_homogeneous();
+        let view_mat = view.to_homogeneous();
+        let model_mat = rot.to_homogeneous();
+        let mvp = projection.to_matrix() * view_mat * model_mat;
         encoder.update_constant_buffer(&data.locals,
                                        &Locals {
-                                           transform: *(mvp).as_ref()
+                                           transform: *(mvp).as_ref(),
+                                           model: *(model_mat).as_ref(),
+                                           view: *(view_mat).as_ref(),
+                                           light_col: [0.1, 0.3, 0.8, 0.8],
+                                           light_pos: [0.0, -1.0, 2.0],
+                                           light_pow: 50.0,
                                        });
 
         encoder.draw(&slice, &pso, &data);
