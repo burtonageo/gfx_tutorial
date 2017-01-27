@@ -16,6 +16,7 @@ use gfx::traits::FactoryExt;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
 use time::{Duration, PreciseTime};
+use std::env::args;
 use std::fs::File;
 use std::io::Read;
 use std::time::Duration as StdDuration;
@@ -102,7 +103,7 @@ fn main() {
                                                    gfx::state::Rasterizer::new_fill().with_cull_back(),
                                                    pipe::new()).unwrap();
 
-    let (verts, inds) = load_obj();
+    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let data = pipe::Data {
         vbuf: vertex_buffer,
@@ -240,11 +241,12 @@ fn main() {
     }
 }
 
-fn load_obj() -> (Vec<Vertex>, Vec<u16>) {
+fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
     use wavefront_obj::obj::Primitive;
     let mut obj_string  = String::new();
-    let mut obj_file = File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/data/mesh/suzanne.obj"))
-        .expect("Could not open suzanne.obj");
+    let mut obj_file_name = env!("CARGO_MANIFEST_DIR").to_string();
+    obj_file_name.push_str(&format!("/data/mesh/{}.obj", obj_name));
+    let mut obj_file = File::open(obj_file_name).expect("Could not open suzanne.obj");
     obj_file.read_to_string(&mut obj_string).expect("Could not read suzanne.obj");
     drop(obj_file);
 
