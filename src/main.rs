@@ -26,6 +26,9 @@ gfx_defines! {
     vertex Vertex {
         pos: [f32; 3] = "position",
         col: [f32; 3] = "color",
+    }
+
+    vertex Normal {
         normal: [f32; 3] = "normal",
     }
 
@@ -40,19 +43,28 @@ gfx_defines! {
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
+        normalbuf: gfx::VertexBuffer<Normal> = (),
         locals: gfx::ConstantBuffer<Locals> = "locals",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
+        main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
 }
 
-impl<'a> From<(&'a obj::Vertex, &'a obj::Normal)> for Vertex {
-    fn from((v, n): (&'a obj::Vertex, &'a obj::Normal)) -> Self {
+impl<'a> From<&'a obj::Vertex> for Vertex {
+    fn from(v: &'a obj::Vertex) -> Self {
         Vertex {
             pos: [v.x as f32, v.y as f32, v.z as f32],
             col: [0.3f32, 0.3, 0.3],
-            normal: [n.x as f32, n.y as f32, n.z as f32],
         }
     }
+}
+
+impl<'a> From<&'a obj::Normal> for Normal {
+	fn from(n: &'a obj::Normal) -> Self {
+		Normal {
+			normal: [n.x as f32, n.y as f32, n.z as f32]
+		}
+	}
 }
 
 const VERT_SRC: &'static [u8] = include_bytes!("../data/shader/standard.vs");
@@ -89,8 +101,8 @@ fn main() {
         .with_decorations(false)
         .with_vsync();
 
-    let (window, mut device, mut factory, main_color, _) =
-        gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::DepthStencil>(builder);
+    let (window, mut device, mut factory, main_color, main_depth) =
+        gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::Depth>(builder);
 
     window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
     window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
@@ -103,12 +115,15 @@ fn main() {
                                                    gfx::state::Rasterizer::new_fill().with_cull_back(),
                                                    pipe::new()).unwrap();
 
-    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
-    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
-    let data = pipe::Data {
+    let ((verts, vinds), (norms, ninds)) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
+    let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &vinds[..]);
+    let (normal_buffer, _nslice) = factory.create_vertex_buffer_with_slice(&norms[..], &ninds[..]);
+    let mut data = pipe::Data {
         vbuf: vertex_buffer,
+        normalbuf: normal_buffer,
         locals: factory.create_constant_buffer(1),
-        out: main_color
+        out: main_color,
+        main_depth: main_depth,
     };
 
     let mut rot = Rotation3::new(na::zero());
@@ -153,6 +168,7 @@ fn main() {
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
                     projection.set_aspect(window.aspect());
+                    gfx_window_glutin::update_views(&window, &mut data.out, &mut data.main_depth);
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
                 }
@@ -166,6 +182,7 @@ fn main() {
                 #[cfg(not(target_os = "macos"))]
                 Event::Resized(w, h) => {
                     projection.set_aspect(aspect(w, h));
+                    gfx_window_glutin::update_views(&window, &mut data.out, &mut data.main_depth)
                 }
                 Event::MouseMoved(x, y) => {
                     let (ww, wh) = window.get_size_signed_or_default();
@@ -220,6 +237,7 @@ fn main() {
         };
 
         encoder.clear(&data.out, CLEAR_COLOR);
+        encoder.clear_depth(&data.main_depth, 1.0);
 
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
@@ -230,18 +248,18 @@ fn main() {
                                            model: *(model_mat).as_ref(),
                                            view: *(view_mat).as_ref(),
                                            light_col: [0.1, 0.3, 0.8, 0.8],
-                                           light_pos: [0.0, -1.0, 2.0],
+                                           light_pos: [0.0, 0.0, -4.0],
                                            light_pow: 50.0,
                                        });
 
-        encoder.draw(&slice, &pso, &data);
+        encoder.draw(&vslice, &pso, &data);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
     }
 }
 
-fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
+fn load_obj(obj_name: &str) -> ((Vec<Vertex>, Vec<u16>), (Vec<Normal>, Vec<u16>)) {
     use wavefront_obj::obj::Primitive;
     let mut obj_string  = String::new();
     let mut obj_file_name = env!("CARGO_MANIFEST_DIR").to_string();
@@ -253,18 +271,22 @@ fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
     let obj = obj::parse(obj_string).expect("Could not parse suzanne.obj");
     let object = obj.objects.get(0).expect("No objects");
 
-    let vertices = object.vertices.iter().zip(&object.normals).map(Vertex::from).collect();
     let indices = object.geometry.iter().flat_map(|g| g.shapes.iter()).flat_map(|s|
         match s.primitive {
-            Primitive::Triangle(i0, i1, i2) => {
+            Primitive::Triangle((i0, _, Some(n0)), (i1, _, Some(n1)), (i2, _, Some(n2))) => {
                 use std::iter::once as o;
-                o(i0.0 as u16).chain(o(i1.0 as u16)).chain(o(i2.0 as u16))
+                o((i0 as u16, n0 as u16)).chain(o((i1 as u16, n1 as u16))).chain(o((i2 as u16, n2 as u16)))
             }
             _ => unimplemented!(),
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    (vertices, indices)
+     let vs = object.vertices.iter().map(Vertex::from).collect();
+     let ns = object.normals.iter().map(Normal::from).collect();
+     let vi = indices.iter().map(|i| i.0).collect();
+     let ni = indices.iter().map(|i| i.1).collect();
+
+    ((vs, vi), (ns, ni))
 }
 
 trait WindowExt {
