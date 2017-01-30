@@ -19,8 +19,8 @@ layout (std140) uniform locals {
 };
 
 void main() {
-	vec3 ambient = vec3(0.1, 0.1, 0.4) * v_color.xyz;
-	vec3 specular = vec3(0.1, 0.3, 1.0);
+	vec3 ambient = vec3(0.1, 0.1, 0.3) * v_color.xyz;
+	vec3 specular = vec3(0.3, 0.3, 0.3);
 
 	float distance = length(light_position - position_world);
 	float distance_squared = distance * distance;
@@ -33,7 +33,7 @@ void main() {
 	vec3 rd = reflect(-l, n); // Direction in which the light is reflected
 	float cos_alpha = clamp(dot(e, rd), 0, 1);
 
-    Target0 = vec4(ambient, 0.8) +
+    Target0 = vec4(ambient, 1.0) +
 			  v_color * light_color * light_power * cos_theta / distance_squared +
 			  vec4(specular, 1.0) * light_color * light_power * pow(cos_alpha, 5) / distance_squared;
 }
