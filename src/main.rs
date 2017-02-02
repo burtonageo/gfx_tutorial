@@ -29,18 +29,27 @@ gfx_defines! {
         normal: [f32; 3] = "normal",
     }
 
-    constant Locals {
+    constant ShaderLight {
+        col: [f32; 4] = "color",
+        pos: [f32; 3] = "position",
+        power: f32 = "power",
+    }
+
+    constant VertLocals {
         transform: [[f32; 4]; 4] = "mvp_transform",
         model: [[f32; 4]; 4] = "model_transform",
         view: [[f32; 4]; 4] = "view_transform",
-        light_col: [f32; 4] = "light_color",
-        light_pos: [f32; 3] = "light_position",
-        light_pow: f32 = "light_power",
+    }
+
+    constant SharedLocals {
+        num_lights: i32 = "num_lights",
     }
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
-        locals: gfx::ConstantBuffer<Locals> = "locals",
+        vert_locals: gfx::ConstantBuffer<VertLocals> = "vert_locals",
+        shared_locals: gfx::ConstantBuffer<SharedLocals> = "shared_locals",
+        lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
         main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
@@ -73,6 +82,36 @@ const SPEED: f32 = 19.0;
 const MOUSE_SPEED: f32 = 7.0;
 const DEFAULT_WIN_SIZE: (i32, i32) = (1024, 768);
 
+#[derive(Clone, Debug, PartialEq)]
+struct Light {
+    position: Point3<f32>,
+    color: [f32; 4],
+    power: f32
+}
+
+impl Light {
+    fn new() -> Self {
+        Light {
+            position: na::origin(),
+            color: [na::zero(); 4],
+            power: na::zero()
+        }
+    }
+}
+
+impl From<Light> for ShaderLight {
+    fn from(l: Light) -> Self {
+        let Point3 { x, y, z } = l.position;
+        ShaderLight {
+            pos: [x, y, z],
+            col: l.color,
+            power: l.power,
+        }
+    }
+}
+
+const MAX_LIGHTS: usize = 10;
+
 fn main() {
     let builder = glutin::WindowBuilder::new()
         .with_title("Gfx Example")
@@ -92,13 +131,15 @@ fn main() {
     let pso = factory.create_pipeline_from_program(&program,
                                                    gfx::Primitive::TriangleList,
                                                    gfx::state::Rasterizer::new_fill().with_cull_back(),
-                                                   pipe::new()).unwrap();
+                                                   pipe::new()).expect("Could not create pso");
 
     let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
     let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let mut data = pipe::Data {
         vbuf: vertex_buffer,
-        locals: factory.create_constant_buffer(1),
+        vert_locals: factory.create_constant_buffer(1),
+        shared_locals: factory.create_constant_buffer(1),
+        lights: factory.create_constant_buffer(MAX_LIGHTS),
         out: main_color,
         main_depth: main_depth,
     };
@@ -219,15 +260,20 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
         let mvp = projection.to_matrix() * view_mat * model_mat;
-        encoder.update_constant_buffer(&data.locals,
-                                       &Locals {
+        let mut lights =[Light::new().into(); MAX_LIGHTS];
+        lights[0] = Light {
+            position: Point3::new(0.0, 0.0001, 4.0),
+            color: [0.1, 0.3, 0.8, 0.8],
+            power: 50.0
+        }.into();
+        encoder.update_constant_buffer(&data.vert_locals,
+                                       &VertLocals {
                                            transform: *(mvp).as_ref(),
                                            model: *(model_mat).as_ref(),
                                            view: *(view_mat).as_ref(),
-                                           light_col: [0.1, 0.3, 0.8, 0.8],
-                                           light_pos: [0.0, 0.0, -4.0],
-                                           light_pow: 75.0,
                                        });
+        encoder.update_constant_buffer(&data.shared_locals, &SharedLocals { num_lights: 1 });
+        encoder.update_buffer(&data.lights, &lights, 0).expect("Could not update buffer");
 
         encoder.draw(&vslice, &pso, &data);
         encoder.flush(&mut device);

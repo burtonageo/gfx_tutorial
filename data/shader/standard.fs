@@ -1,5 +1,7 @@
 #version 150 core
 
+const int MAX_LIGHTS = 10;
+
 in vec4 v_color;
 in vec3 position_world;
 in vec3 light_direction_camera;
@@ -8,19 +10,27 @@ in vec3 normal_camera;
 
 out vec4 Target0;
 
-layout (std140) uniform locals {
-    mat4 mvp_transform;
-    mat4 model_transform;
-    mat4 view_transform;
+struct Light {
+    vec4 color;
+    vec3 position;
+    float power;
+};
 
-    vec4 light_color;
-    vec3 light_position;
-    float light_power;
+layout (std140) uniform shared_locals {
+    int num_lights;
+};
+
+layout (std140) uniform lights_array {
+    Light lights[MAX_LIGHTS];
 };
 
 void main() {
+    vec3 light_position = lights[0].position;
+    vec4 light_color = lights[0].color;
+    float light_power = lights[0].power;
+
 	vec3 ambient = vec3(0.1, 0.1, 0.3) * v_color.xyz;
-	vec3 specular = vec3(0.3, 0.3, 0.3);
+	vec3 specular = vec3(0.2, 0.2, 0.3);
 
 	float distance = length(light_position - position_world);
 	float distance_squared = distance * distance;
