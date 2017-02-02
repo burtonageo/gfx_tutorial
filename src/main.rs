@@ -10,25 +10,22 @@ extern crate scopeguard;
 extern crate time;
 extern crate wavefront_obj;
 
+mod model_load;
+
 use angular::{Angle, Degrees};
 use gfx::Device;
 use gfx::traits::FactoryExt;
+use model_load::load_obj;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
 use time::{Duration, PreciseTime};
 use std::env::args;
-use std::fs::File;
-use std::io::Read;
 use std::time::Duration as StdDuration;
-use wavefront_obj::obj;
 
 gfx_defines! {
     vertex Vertex {
         pos: [f32; 3] = "position",
         col: [f32; 3] = "color",
-    }
-
-    vertex Normal {
         normal: [f32; 3] = "normal",
     }
 
@@ -43,28 +40,10 @@ gfx_defines! {
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
-        normalbuf: gfx::VertexBuffer<Normal> = (),
         locals: gfx::ConstantBuffer<Locals> = "locals",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
         main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
-}
-
-impl<'a> From<&'a obj::Vertex> for Vertex {
-    fn from(v: &'a obj::Vertex) -> Self {
-        Vertex {
-            pos: [v.x as f32, v.y as f32, v.z as f32],
-            col: [0.3f32, 0.3, 0.3],
-        }
-    }
-}
-
-impl<'a> From<&'a obj::Normal> for Normal {
-	fn from(n: &'a obj::Normal) -> Self {
-		Normal {
-			normal: [n.x as f32, n.y as f32, n.z as f32]
-		}
-	}
 }
 
 const VERT_SRC: &'static [u8] = include_bytes!("../data/shader/standard.vs");
@@ -115,12 +94,10 @@ fn main() {
                                                    gfx::state::Rasterizer::new_fill().with_cull_back(),
                                                    pipe::new()).unwrap();
 
-    let ((verts, vinds), (norms, ninds)) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
-    let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &vinds[..]);
-    let (normal_buffer, _nslice) = factory.create_vertex_buffer_with_slice(&norms[..], &ninds[..]);
+    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
+    let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let mut data = pipe::Data {
         vbuf: vertex_buffer,
-        normalbuf: normal_buffer,
         locals: factory.create_constant_buffer(1),
         out: main_color,
         main_depth: main_depth,
@@ -249,7 +226,7 @@ fn main() {
                                            view: *(view_mat).as_ref(),
                                            light_col: [0.1, 0.3, 0.8, 0.8],
                                            light_pos: [0.0, 0.0, -4.0],
-                                           light_pow: 50.0,
+                                           light_pow: 75.0,
                                        });
 
         encoder.draw(&vslice, &pso, &data);
@@ -257,36 +234,6 @@ fn main() {
         window.swap_buffers().unwrap();
         device.cleanup();
     }
-}
-
-fn load_obj(obj_name: &str) -> ((Vec<Vertex>, Vec<u16>), (Vec<Normal>, Vec<u16>)) {
-    use wavefront_obj::obj::Primitive;
-    let mut obj_string  = String::new();
-    let mut obj_file_name = env!("CARGO_MANIFEST_DIR").to_string();
-    obj_file_name.push_str(&format!("/data/mesh/{}.obj", obj_name));
-    let mut obj_file = File::open(obj_file_name).expect("Could not open suzanne.obj");
-    obj_file.read_to_string(&mut obj_string).expect("Could not read suzanne.obj");
-    drop(obj_file);
-
-    let obj = obj::parse(obj_string).expect("Could not parse suzanne.obj");
-    let object = obj.objects.get(0).expect("No objects");
-
-    let indices = object.geometry.iter().flat_map(|g| g.shapes.iter()).flat_map(|s|
-        match s.primitive {
-            Primitive::Triangle((i0, _, Some(n0)), (i1, _, Some(n1)), (i2, _, Some(n2))) => {
-                use std::iter::once as o;
-                o((i0 as u16, n0 as u16)).chain(o((i1 as u16, n1 as u16))).chain(o((i2 as u16, n2 as u16)))
-            }
-            _ => unimplemented!(),
-        })
-        .collect::<Vec<_>>();
-
-     let vs = object.vertices.iter().map(Vertex::from).collect();
-     let ns = object.normals.iter().map(Normal::from).collect();
-     let vi = indices.iter().map(|i| i.0).collect();
-     let ni = indices.iter().map(|i| i.1).collect();
-
-    ((vs, vi), (ns, ni))
 }
 
 trait WindowExt {
