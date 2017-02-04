@@ -78,7 +78,7 @@ impl Input {
     }
 }
 
-const SPEED: f32 = 19.0;
+const SPEED: f32 = 4.0;
 const MOUSE_SPEED: f32 = 7.0;
 const DEFAULT_WIN_SIZE: (i32, i32) = (1024, 768);
 
@@ -89,8 +89,8 @@ struct Light {
     power: f32
 }
 
-impl Light {
-    fn new() -> Self {
+impl Default for Light {
+    fn default() -> Self {
         Light {
             position: na::origin(),
             color: [na::zero(); 4],
@@ -149,6 +149,10 @@ fn main() {
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
+
+    // Initial sleep to ensure that everything is initialised before
+    // events are processed.
+    std::thread::sleep(StdDuration::from_millis(30));
 
     'main: loop {
         let current = PreciseTime::now();
@@ -260,8 +264,7 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
         let mvp = projection.to_matrix() * view_mat * model_mat;
-        let mut lights =[Light::new().into(); MAX_LIGHTS];
-        lights[0] = Light {
+        let light = Light {
             position: Point3::new(0.0, 0.0001, 4.0),
             color: [0.1, 0.3, 0.8, 0.8],
             power: 50.0
@@ -273,7 +276,7 @@ fn main() {
                                            view: *(view_mat).as_ref(),
                                        });
         encoder.update_constant_buffer(&data.shared_locals, &SharedLocals { num_lights: 1 });
-        encoder.update_buffer(&data.lights, &lights, 0).expect("Could not update buffer");
+        encoder.update_buffer(&data.lights, &[light], 0).expect("Could not update buffer");
 
         encoder.draw(&vslice, &pso, &data);
         encoder.flush(&mut device);
