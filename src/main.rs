@@ -64,16 +64,20 @@ struct Input {
     position: Point3<f32>,
     horizontal_angle: Angle<f32>,
     vertical_angle: Angle<f32>,
-    fov: Angle<f32>
+    fov: Angle<f32>,
 }
 
 impl Input {
     fn new() -> Self {
         Input {
-            position: Point3 { x: 0.0, y: 0.0, z: 10.0 },
+            position: Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 10.0,
+            },
             horizontal_angle: Angle::full(),
             vertical_angle: Angle::zero(),
-            fov: Angle::eighth()
+            fov: Angle::eighth(),
         }
     }
 }
@@ -86,7 +90,7 @@ const DEFAULT_WIN_SIZE: (i32, i32) = (1024, 768);
 struct Light {
     position: Point3<f32>,
     color: [f32; 4],
-    power: f32
+    power: f32,
 }
 
 impl Default for Light {
@@ -94,7 +98,7 @@ impl Default for Light {
         Light {
             position: na::origin(),
             color: [na::zero(); 4],
-            power: na::zero()
+            power: na::zero(),
         }
     }
 }
@@ -129,9 +133,10 @@ fn main() {
     let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
     let program = factory.link_program(VERT_SRC, FRAG_SRC).unwrap();
     let pso = factory.create_pipeline_from_program(&program,
-                                                   gfx::Primitive::TriangleList,
-                                                   gfx::state::Rasterizer::new_fill().with_cull_back(),
-                                                   pipe::new()).expect("Could not create pso");
+                                      gfx::Primitive::TriangleList,
+                                      gfx::state::Rasterizer::new_fill().with_cull_back(),
+                                      pipe::new())
+        .expect("Could not create pso");
 
     let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
     let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
@@ -172,13 +177,13 @@ fn main() {
         let direction = Vector3 {
             x: iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
             y: iput.vertical_angle.sin(),
-            z: iput.vertical_angle.cos() * iput.horizontal_angle.cos()
+            z: iput.vertical_angle.cos() * iput.horizontal_angle.cos(),
         };
 
         let right = Vector3 {
             x: (iput.horizontal_angle - Angle::quarter()).sin(),
             y: na::zero(),
-            z: (iput.horizontal_angle - Angle::quarter()).cos()
+            z: (iput.horizontal_angle - Angle::quarter()).cos(),
         };
 
         // Hack to get around lack of resize event on MacOS
@@ -200,7 +205,8 @@ fn main() {
         for e in window.poll_events() {
             use glutin::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
             match e {
-                Event::Closed | Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
+                Event::Closed |
+                Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
                 #[cfg(not(target_os = "macos"))]
                 Event::Resized(w, h) => {
                     projection.set_aspect(aspect(w, h));
@@ -210,7 +216,7 @@ fn main() {
                     let (ww, wh) = window.get_size_signed_or_default();
 
                     iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
-                    iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y ) as f32);
+                    iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y) as f32);
 
                     iput.horizontal_angle = iput.horizontal_angle.normalized();
                     iput.vertical_angle = iput.vertical_angle.normalized();
@@ -232,7 +238,7 @@ fn main() {
                 Event::MouseWheel(delta, _) => {
                     let dy = match delta {
                         MouseScrollDelta::LineDelta(_, y) => y,
-                        MouseScrollDelta::PixelDelta(_, y) => y
+                        MouseScrollDelta::PixelDelta(_, y) => y,
                     };
                     iput.fov = (iput.fov + Angle::Degrees(dy / 5.0)).normalized();
                     projection.set_fovy(iput.fov.in_radians());
@@ -249,7 +255,8 @@ fn main() {
             continue;
         }
 
-        rot = na::append_rotation(&rot, &Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
+        rot = na::append_rotation(&rot,
+                                  &Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
 
         let view = {
             let up = na::cross(&right, &direction);
@@ -265,10 +272,11 @@ fn main() {
         let model_mat = rot.to_homogeneous();
         let mvp = projection.to_matrix() * view_mat * model_mat;
         let light = Light {
-            position: Point3::new(0.0, 0.0001, 4.0),
-            color: [0.1, 0.3, 0.8, 0.8],
-            power: 50.0
-        }.into();
+                position: Point3::new(0.0, 0.0001, 4.0),
+                color: [0.1, 0.3, 0.8, 0.8],
+                power: 50.0,
+            }
+            .into();
         encoder.update_constant_buffer(&data.vert_locals,
                                        &VertLocals {
                                            transform: *(mvp).as_ref(),

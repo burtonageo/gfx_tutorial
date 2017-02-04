@@ -74,7 +74,8 @@ impl PackedObjVertex {
     }
 }
 
-fn build_unified_buffers(vertices: &[obj::Vertex], normals: &[obj::Normal])
+fn build_unified_buffers(vertices: &[obj::Vertex],
+                         normals: &[obj::Normal])
                          -> (Vec<Vertex>, Vec<u16>) {
     let mut out_verts = Vec::new();
     let mut out_inds = Vec::new();
