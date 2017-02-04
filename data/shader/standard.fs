@@ -37,13 +37,13 @@ void main() {
 
 	vec3 n = normalize(normal_camera);
 	vec3 l = normalize(light_direction_camera);
-	float cos_theta = clamp(dot(n, l), 0, 1);
+	float cos_theta = clamp(dot(n, l), 0.0, 1.0);
 
 	vec3 e = normalize(eye_direction_camera);
 	vec3 rd = reflect(-l, n); // Direction in which the light is reflected
-	float cos_alpha = clamp(dot(e, rd), 0, 1);
+	float cos_alpha = clamp(dot(e, rd), 0.0, 1.0);
 
     Target0 = vec4(ambient, 1.0) +
-			  v_color * light_color * light_power * cos_theta / distance_squared +
-			  vec4(specular, 1.0) * light_color * light_power * pow(cos_alpha, 5) / distance_squared;
+			  (v_color * light_color * light_power * cos_theta / distance_squared) +
+			  (vec4(specular, 1.0) * light_color * light_power * pow(cos_alpha, 5) / distance_squared);
 }
