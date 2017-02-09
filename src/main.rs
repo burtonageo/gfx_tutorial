@@ -3,6 +3,7 @@ extern crate angular;
 extern crate gfx;
 extern crate gfx_window_glutin;
 extern crate glutin;
+extern crate image;
 extern crate num;
 extern crate nalgebra as na;
 #[macro_use]
