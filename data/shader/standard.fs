@@ -3,7 +3,7 @@
 const int MAX_LIGHTS = 10;
 
 in vec4 v_color;
-in vec2 v_uv;
+in vec2 v_tex_coord;
 
 in vec3 position_world;
 in vec3 light_direction_camera;

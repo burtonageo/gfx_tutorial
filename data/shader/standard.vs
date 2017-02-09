@@ -3,12 +3,12 @@
 const int MAX_LIGHTS = 10;
 
 in vec3 position;
-in vec2 uv;
+in vec2 tex_coord;
 in vec3 color;
 in vec3 normal;
 
 out vec4 v_color;
-out vec2 v_uv;
+out vec2 v_tex_coord;
 out vec3 position_world;
 out vec3 light_direction_camera;
 out vec3 eye_direction_camera;
@@ -36,7 +36,7 @@ layout (std140) uniform lights_array {
 
 void main() {
     v_color = vec4(color, 1.0);
-    v_uv = uv;
+    v_tex_coord = tex_coord;
 
     vec3 light_position = lights[0].position;
 
