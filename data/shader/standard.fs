@@ -19,7 +19,7 @@ struct Light {
 };
 
 layout (std140) uniform shared_locals {
-    int num_lights;
+    uint num_lights;
 };
 
 layout (std140) uniform lights_array {

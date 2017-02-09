@@ -44,7 +44,7 @@ gfx_defines! {
     }
 
     constant SharedLocals {
-        num_lights: i32 = "num_lights",
+        num_lights: u32 = "num_lights",
     }
 
     pipeline pipe {
