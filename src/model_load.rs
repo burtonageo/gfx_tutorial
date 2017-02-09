@@ -8,10 +8,11 @@ use Vertex;
 
 
 impl Vertex {
-    fn new(v: &obj::Vertex, normal: &obj::Normal) -> Self {
+    fn new(v: &obj::Vertex, tex_coord: &obj::TVertex, normal: &obj::Normal) -> Self {
         Vertex {
             pos: [v.x as f32, v.y as f32, v.z as f32],
             col: [0.3, 0.3, 0.3],
+            uv: [tex_coord.u as f32, tex_coord.v as f32],
             normal: [normal.x as f32, normal.y as f32, normal.z as f32],
         }
     }
@@ -30,28 +31,37 @@ pub fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
     let object = obj.objects.get(0).expect("No objects");
 
     let mut verts = Vec::new();
+    let mut uvs = Vec::new();
     let mut norms = Vec::new();
 
     for s in object.geometry.iter().flat_map(|g| g.shapes.iter()) {
         match s.primitive {
-            Primitive::Triangle((i0, _, Some(n0)), (i1, _, Some(n1)), (i2, _, Some(n2))) => {
+            Primitive::Triangle((i0, Some(t0), Some(n0)),
+                                (i1, Some(t1), Some(n1)),
+                                (i2, Some(t2), Some(n2))) => {
                 verts.push(object.vertices[i0 as usize]);
-                norms.push(object.normals[n0 as usize]);
                 verts.push(object.vertices[i1 as usize]);
-                norms.push(object.normals[n1 as usize]);
                 verts.push(object.vertices[i2 as usize]);
+
+                uvs.push(object.tex_vertices[t0 as usize]);
+                uvs.push(object.tex_vertices[t1 as usize]);
+                uvs.push(object.tex_vertices[t2 as usize]);
+
+                norms.push(object.normals[n1 as usize]);
+                norms.push(object.normals[n0 as usize]);
                 norms.push(object.normals[n2 as usize]);
             }
             _ => unimplemented!(),
         }
     }
 
-    build_unified_buffers(&verts[..], &norms[..])
+    build_unified_buffers(&verts[..], &uvs[..], &norms[..])
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 struct PackedObjVertex {
     pos: obj::Vertex,
+    uv: obj::TVertex,
     norm: obj::Normal,
 }
 
@@ -69,24 +79,27 @@ impl Ord for PackedObjVertex {
 }
 
 impl PackedObjVertex {
-    fn new(p: obj::Vertex, n: obj::Normal) -> Self {
-        PackedObjVertex { pos: p, norm: n }
+    fn new(p: obj::Vertex, t: obj::TVertex, n: obj::Normal) -> Self {
+        PackedObjVertex { pos: p, uv: t, norm: n }
     }
 }
 
 fn build_unified_buffers(vertices: &[obj::Vertex],
+                         tex_coords: &[obj::TVertex],
                          normals: &[obj::Normal])
                          -> (Vec<Vertex>, Vec<u16>) {
     let mut out_verts = Vec::new();
     let mut out_inds = Vec::new();
     let mut vert_to_out = BTreeMap::new();
 
-    for (v, n) in vertices.iter().zip(normals.iter()) {
-        let packed = PackedObjVertex::new(*v, *n);
+    for packed in vertices.iter()
+                          .zip(tex_coords.iter())
+                          .zip(normals.iter())
+                          .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n)) {
         match vert_to_out.entry(packed.clone()) {
             Entry::Occupied(e) => out_inds.push(*e.get()),
             Entry::Vacant(e) => {
-                out_verts.push(Vertex::new(&packed.pos, &packed.norm));
+                out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
                 let new_index = (out_verts.len() - 1) as u16;
                 out_inds.push(new_index);
                 e.insert(new_index);

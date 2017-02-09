@@ -27,6 +27,7 @@ gfx_defines! {
     vertex Vertex {
         pos: [f32; 3] = "position",
         col: [f32; 3] = "color",
+        uv: [f32; 2] = "tex_coord",
         normal: [f32; 3] = "normal",
     }
 
