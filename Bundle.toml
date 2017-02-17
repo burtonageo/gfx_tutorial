@@ -1,0 +1,5 @@
+name = "Gfx Tutorial"
+identifier = "com.gab.gfx-tutorial"
+version = "0.1.0"
+copyright = "Copyright © George Burton 2016. All rights reserved."
+resources = ["./data"]

@@ -1,9 +1,12 @@
 extern crate angular;
+extern crate find_folder;
 #[macro_use]
 extern crate gfx;
 extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate image;
+#[macro_use]
+extern crate lazy_static; 
 extern crate num;
 extern crate nalgebra as na;
 #[macro_use]
@@ -12,6 +15,7 @@ extern crate time;
 extern crate wavefront_obj;
 
 mod model_load;
+mod util;
 
 use angular::{Angle, Degrees};
 use gfx::Device;

@@ -6,6 +6,7 @@ use std::cmp::{Eq, Ord, Ordering};
 use wavefront_obj::obj;
 use Vertex;
 
+use util::get_assets_folder;
 
 impl Vertex {
     fn new(v: &obj::Vertex, tex_coord: &obj::TVertex, normal: &obj::Normal) -> Self {
@@ -21,8 +22,8 @@ impl Vertex {
 pub fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
     use wavefront_obj::obj::Primitive;
     let mut obj_string = String::new();
-    let mut obj_file_name = env!("CARGO_MANIFEST_DIR").to_string();
-    obj_file_name.push_str(&format!("/data/mesh/{}.obj", obj_name));
+    let mut obj_file_name = get_assets_folder().unwrap().to_path_buf();
+    obj_file_name.push(&format!("mesh/{}.obj", obj_name));
     let mut obj_file = File::open(obj_file_name).expect("Could not open suzanne.obj");
     obj_file.read_to_string(&mut obj_string).expect("Could not read suzanne.obj");
     drop(obj_file);
