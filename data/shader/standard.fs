@@ -2,7 +2,6 @@
 
 const int MAX_LIGHTS = 10;
 
-in vec4 v_color;
 in vec2 v_tex_coord;
 
 in vec3 position_world;
@@ -11,6 +10,8 @@ in vec3 eye_direction_camera;
 in vec3 normal_camera;
 
 out vec4 Target0;
+
+uniform sampler2D color_texture;
 
 struct Light {
     vec4 color;
@@ -30,6 +31,8 @@ void main() {
     vec3 light_position = lights[0].position;
     vec4 light_color = lights[0].color;
     float light_power = lights[0].power;
+
+    vec4 v_color = texture(color_texture, v_tex_coord);
 
 	vec3 ambient = vec3(0.1, 0.1, 0.3) * v_color.xyz;
 	vec3 specular = vec3(0.2, 0.2, 0.3);

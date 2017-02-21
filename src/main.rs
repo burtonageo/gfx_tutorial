@@ -18,19 +18,21 @@ mod model_load;
 mod util;
 
 use angular::{Angle, Degrees};
-use gfx::Device;
+use gfx::{Device, Factory};
+use gfx::texture::{AaMode, FilterMethod, Kind, SamplerInfo, WrapMode};
 use gfx::traits::FactoryExt;
+use image::GenericImage;
 use model_load::load_obj;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
-use time::{Duration, PreciseTime};
 use std::env::args;
 use std::time::Duration as StdDuration;
+use time::{Duration, PreciseTime};
+use util::get_assets_folder;
 
 gfx_defines! {
     vertex Vertex {
         pos: [f32; 3] = "position",
-        col: [f32; 3] = "color",
         uv: [f32; 2] = "tex_coord",
         normal: [f32; 3] = "normal",
     }
@@ -55,6 +57,7 @@ gfx_defines! {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         vert_locals: gfx::ConstantBuffer<VertLocals> = "vert_locals",
         shared_locals: gfx::ConstantBuffer<SharedLocals> = "shared_locals",
+        main_texture: gfx::TextureSampler<[f32; 4]> = "color_texture",
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
         main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
@@ -144,6 +147,17 @@ fn main() {
                                       pipe::new())
         .expect("Could not create pso");
 
+    let mut img_path = get_assets_folder().unwrap().to_path_buf();
+    img_path.push("img/checker.png");
+    let img = image::open(img_path).expect("Could not open image");
+    let (iw, ih) = img.dimensions();
+    let pixels = img.raw_pixels();
+    let (_, srv) = factory.create_texture_immutable_u8::<[f32; 4]>(
+            Kind::D2(iw as u16, ih as u16, AaMode::Single), &[&pixels[..]])
+        .expect("Could not create texture");
+
+    let sampler = factory.create_sampler(SamplerInfo::new(FilterMethod::Scale, WrapMode::Clamp));
+
     let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
     let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let mut data = pipe::Data {
@@ -151,6 +165,7 @@ fn main() {
         vert_locals: factory.create_constant_buffer(1),
         shared_locals: factory.create_constant_buffer(1),
         lights: factory.create_constant_buffer(MAX_LIGHTS),
+        main_texture: (srv, sampler),
         out: main_color,
         main_depth: main_depth,
     };
@@ -200,8 +215,8 @@ fn main() {
             let (w, h) = window.get_size_signed_or_default();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    projection.set_aspect(window.aspect());
                     gfx_window_glutin::update_views(&window, &mut data.out, &mut data.main_depth);
+                    projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
                 }

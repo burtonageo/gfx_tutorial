@@ -12,7 +12,6 @@ impl Vertex {
     fn new(v: &obj::Vertex, tex_coord: &obj::TVertex, normal: &obj::Normal) -> Self {
         Vertex {
             pos: [v.x as f32, v.y as f32, v.z as f32],
-            col: [0.3, 0.3, 0.3],
             uv: [tex_coord.u as f32, tex_coord.v as f32],
             normal: [normal.x as f32, normal.y as f32, normal.z as f32],
         }
