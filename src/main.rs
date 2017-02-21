@@ -6,7 +6,7 @@ extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate image;
 #[macro_use]
-extern crate lazy_static; 
+extern crate lazy_static;
 extern crate num;
 extern crate nalgebra as na;
 #[macro_use]
@@ -152,9 +152,12 @@ fn main() {
     let img = image::open(img_path).expect("Could not open image");
     let (iw, ih) = img.dimensions();
     let pixels = img.raw_pixels();
-    let (_, srv) = factory.create_texture_immutable_u8::<[f32; 4]>(
-            Kind::D2(iw as u16, ih as u16, AaMode::Single), &[&pixels[..]])
-        .expect("Could not create texture");
+    let (_, srv) =
+        factory.create_texture_immutable_u8::<[f32; 4]>(Kind::D2(iw as u16,
+                                                              ih as u16,
+                                                              AaMode::Single),
+                                                     &[&pixels[..]])
+            .expect("Could not create texture");
 
     let sampler = factory.create_sampler(SamplerInfo::new(FilterMethod::Scale, WrapMode::Clamp));
 

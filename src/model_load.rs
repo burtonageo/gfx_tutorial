@@ -80,7 +80,11 @@ impl Ord for PackedObjVertex {
 
 impl PackedObjVertex {
     fn new(p: obj::Vertex, t: obj::TVertex, n: obj::Normal) -> Self {
-        PackedObjVertex { pos: p, uv: t, norm: n }
+        PackedObjVertex {
+            pos: p,
+            uv: t,
+            norm: n,
+        }
     }
 }
 
@@ -93,9 +97,9 @@ fn build_unified_buffers(vertices: &[obj::Vertex],
     let mut vert_to_out = BTreeMap::new();
 
     for packed in vertices.iter()
-                          .zip(tex_coords.iter())
-                          .zip(normals.iter())
-                          .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n)) {
+        .zip(tex_coords.iter())
+        .zip(normals.iter())
+        .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n)) {
         match vert_to_out.entry(packed.clone()) {
             Entry::Occupied(e) => out_inds.push(*e.get()),
             Entry::Vacant(e) => {
