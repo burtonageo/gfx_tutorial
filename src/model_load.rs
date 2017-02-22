@@ -65,8 +65,9 @@ struct PackedObjVertex {
     norm: obj::Normal,
 }
 
-// @HACK: floats are not strictly comparable, we are just using this so that the BTreeMap works. Note that the
-//        code I'm copying this from (https://github.com/opengl-tutorials/ogl/blob/master/common/vboindexer.cpp)
+// @HACK: floats are not strictly comparable, we are just using this so that the
+//        BTreeMap works. Note that the code I'm copying this from
+//        (https://github.com/opengl-tutorials/ogl/blob/master/common/vboindexer.cpp)
 //        also has this problem.
 impl Eq for PackedObjVertex {}
 impl Ord for PackedObjVertex {
