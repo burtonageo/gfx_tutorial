@@ -298,7 +298,7 @@ fn main() {
         let light = Light {
                 position: Point3::new(0.0, 0.0001, 4.0),
                 color: [0.1, 0.3, 0.8, 0.8],
-                power: 50.0,
+                power: 200.0,
             }
             .into();
         encoder.update_constant_buffer(&data.vert_locals,
