@@ -153,7 +153,8 @@ fn main() {
         let img = image::open(img_path).expect("Could not open image").to_rgba();
         let (iw, ih) = img.dimensions();
         let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
-        factory.create_texture_immutable_u8::<Rgba8>(kind, &[&img]).expect("Could not create texture")
+        factory.create_texture_immutable_u8::<Rgba8>(kind, &[&img])
+            .expect("Could not create texture")
     };
 
     let sampler = factory.create_sampler_linear();
