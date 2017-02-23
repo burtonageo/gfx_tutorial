@@ -18,7 +18,7 @@ mod load;
 mod util;
 
 use angular::{Angle, Degrees};
-use gfx::{Device, Factory};
+use gfx::{Bundle, Device, Factory};
 use gfx::format::{Depth, Rgba8};
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
@@ -160,8 +160,8 @@ fn main() {
     let sampler = factory.create_sampler_linear();
 
     let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
-    let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
-    let mut data = pipe::Data {
+    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
+    let data = pipe::Data {
         vbuf: vertex_buffer,
         vert_locals: factory.create_constant_buffer(1),
         shared_locals: factory.create_constant_buffer(1),
@@ -176,6 +176,8 @@ fn main() {
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
+
+    let mut bundle = Bundle::new(slice, pso, data);
 
     // Initial sleep to ensure that everything is initialised before
     // events are processed.
@@ -216,7 +218,9 @@ fn main() {
             let (w, h) = window.get_size_signed_or_default();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    gfx_window_glutin::update_views(&window, &mut data.out, &mut data.main_depth);
+                    gfx_window_glutin::update_views(&window,
+                                                    &mut bundle.data.out,
+                                                    &mut bundle.data.main_depth);
                     projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
@@ -231,8 +235,10 @@ fn main() {
                 Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
                 #[cfg(not(target_os = "macos"))]
                 Event::Resized(w, h) => {
-                    projection.set_aspect(aspect(w, h));
-                    gfx_window_glutin::update_views(&window, &mut data.out, &mut data.main_depth)
+                    gfx_window_glutin::update_views(&window,
+                                                    &mut bundle.data.out,
+                                                    &mut bundle.data.main_depth);
+                    projection.set_aspect(window.aspect());
                 }
                 Event::MouseMoved(x, y) => {
                     let (ww, wh) = window.get_size_signed_or_default();
@@ -287,8 +293,8 @@ fn main() {
                                   &up)
         };
 
-        encoder.clear(&data.out, CLEAR_COLOR);
-        encoder.clear_depth(&data.main_depth, 1.0);
+        encoder.clear(&bundle.data.out, CLEAR_COLOR);
+        encoder.clear_depth(&bundle.data.main_depth, 1.0);
 
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
@@ -299,16 +305,16 @@ fn main() {
                 power: 200.0,
             }
             .into();
-        encoder.update_constant_buffer(&data.vert_locals,
+        encoder.update_constant_buffer(&bundle.data.vert_locals,
                                        &VertLocals {
                                            transform: *(mvp).as_ref(),
                                            model: *(model_mat).as_ref(),
                                            view: *(view_mat).as_ref(),
                                        });
-        encoder.update_constant_buffer(&data.shared_locals, &SharedLocals { num_lights: 1 });
-        encoder.update_buffer(&data.lights, &[light], 0).expect("Could not update buffer");
+        encoder.update_constant_buffer(&bundle.data.shared_locals, &SharedLocals { num_lights: 1 });
+        encoder.update_buffer(&bundle.data.lights, &[light], 0).expect("Could not update buffer");
 
-        encoder.draw(&vslice, &pso, &data);
+        bundle.encode(&mut encoder);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
