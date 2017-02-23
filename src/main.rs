@@ -19,9 +19,9 @@ mod util;
 
 use angular::{Angle, Degrees};
 use gfx::{Device, Factory};
-use gfx::texture::{AaMode, FilterMethod, Kind, SamplerInfo, WrapMode};
+use gfx::format::{Depth, Rgba8};
+use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
-use image::GenericImage;
 use model_load::load_obj;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
@@ -133,7 +133,7 @@ fn main() {
         .with_vsync();
 
     let (window, mut device, mut factory, main_color, main_depth) =
-        gfx_window_glutin::init::<gfx::format::Rgba8, gfx::format::Depth>(builder);
+        gfx_window_glutin::init::<Rgba8, Depth>(builder);
 
     window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
     window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
@@ -149,17 +149,13 @@ fn main() {
 
     let mut img_path = get_assets_folder().unwrap().to_path_buf();
     img_path.push("img/checker.png");
-    let img = image::open(img_path).expect("Could not open image");
+    let img = image::open(img_path).expect("Could not open image").to_rgba();
     let (iw, ih) = img.dimensions();
-    let pixels = img.raw_pixels();
-    let (_, srv) =
-        factory.create_texture_immutable_u8::<[f32; 4]>(Kind::D2(iw as u16,
-                                                              ih as u16,
-                                                              AaMode::Single),
-                                                     &[&pixels[..]])
+    let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
+    let (_, srv) = factory.create_texture_immutable_u8::<Rgba8>(kind, &[&img])
             .expect("Could not create texture");
 
-    let sampler = factory.create_sampler(SamplerInfo::new(FilterMethod::Scale, WrapMode::Clamp));
+    let sampler = factory.create_sampler_linear();
 
     let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
     let (vertex_buffer, vslice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
