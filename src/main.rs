@@ -14,7 +14,7 @@ extern crate scopeguard;
 extern crate time;
 extern crate wavefront_obj;
 
-mod model_load;
+mod load;
 mod util;
 
 use angular::{Angle, Degrees};
@@ -22,7 +22,7 @@ use gfx::{Device, Factory};
 use gfx::format::{Depth, Rgba8};
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
-use model_load::load_obj;
+use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
 use num::Zero;
 use std::env::args;
