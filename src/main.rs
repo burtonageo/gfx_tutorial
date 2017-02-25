@@ -2,6 +2,7 @@ extern crate angular;
 extern crate find_folder;
 #[macro_use]
 extern crate gfx;
+extern crate gfx_text;
 extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate image;
@@ -177,10 +178,13 @@ fn main() {
         main_depth: main_depth,
     };
 
+    let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
+
     let mut rot = Rotation3::new(na::zero());
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
+    let mut show_fps = false;
     let mut is_paused = false;
 
     let mut bundle = Bundle::new(slice, pso, data);
@@ -269,6 +273,9 @@ fn main() {
                 Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Right)) => {
                     iput.position -= right * SPEED * dt_s;
                 }
+                Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::Space)) => {
+                    show_fps = !show_fps;
+                }
                 Event::MouseWheel(delta, _) => {
                     let dy = match delta {
                         MouseScrollDelta::LineDelta(_, y) => y,
@@ -287,6 +294,10 @@ fn main() {
 
         if is_paused {
             continue;
+        }
+
+        if show_fps {
+            text.add("The quick brown fox jumps over the lazy dog", [10, 20], [0.65, 0.16, 0.16, 1.0]);
         }
 
         rot = na::append_rotation(&rot,
@@ -323,6 +334,7 @@ fn main() {
         encoder.update_buffer(&bundle.data.lights, &[light], 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
+        text.draw(&mut encoder, &bundle.data.out).unwrap();
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
