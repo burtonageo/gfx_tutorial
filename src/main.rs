@@ -53,12 +53,17 @@ gfx_defines! {
         num_lights: u32 = "num_lights",
     }
 
+    constant Camera {
+        position: [f32; 4] = "cam_position",
+    }
+
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         vert_locals: gfx::ConstantBuffer<VertLocals> = "vert_locals",
         shared_locals: gfx::ConstantBuffer<SharedLocals> = "shared_locals",
         main_texture: gfx::TextureSampler<[f32; 4]> = "color_texture",
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
+        camera: gfx::ConstantBuffer<Camera> = "main_camera",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
         main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
@@ -166,6 +171,7 @@ fn main() {
         vert_locals: factory.create_constant_buffer(1),
         shared_locals: factory.create_constant_buffer(1),
         lights: factory.create_constant_buffer(MAX_LIGHTS),
+        camera: factory.create_constant_buffer(1),
         main_texture: (srv, sampler),
         out: main_color,
         main_depth: main_depth,
@@ -311,7 +317,9 @@ fn main() {
                                            model: *(model_mat).as_ref(),
                                            view: *(view_mat).as_ref(),
                                        });
+        let cam_pos = [iput.position.x, iput.position.y, iput.position.z, 1.0];
         encoder.update_constant_buffer(&bundle.data.shared_locals, &SharedLocals { num_lights: 1 });
+        encoder.update_constant_buffer(&bundle.data.camera, &Camera { position: cam_pos });
         encoder.update_buffer(&bundle.data.lights, &[light], 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
