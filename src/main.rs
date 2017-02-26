@@ -297,7 +297,9 @@ fn main() {
         }
 
         if show_fps {
-            text.add("The quick brown fox jumps over the lazy dog", [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            text.add("The quick brown fox jumps over the lazy dog",
+                     [10, 20],
+                     [0.65, 0.16, 0.16, 1.0]);
         }
 
         rot = na::append_rotation(&rot,
@@ -335,9 +337,7 @@ fn main() {
                                        });
         let cam_pos = [iput.position.x, iput.position.y, iput.position.z, 1.0];
         encoder.update_constant_buffer(&bundle.data.shared_locals,
-                                       &SharedLocals {
-                                            num_lights: lights.len() as u32,
-                                       });
+                                       &SharedLocals { num_lights: lights.len() as u32 });
         encoder.update_constant_buffer(&bundle.data.camera, &Camera { position: cam_pos });
         encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
