@@ -29,27 +29,31 @@ layout (std140) uniform lights_array {
 };
 
 void main() {
-    vec3 light_position = lights[0].position;
-    vec4 light_color = lights[0].color;
-    float light_power = lights[0].power;
-
     vec4 v_color = texture(color_texture, v_tex_coord);
 
-    // ambient
-	vec4 ambient = light_color * 0.1;
+    for (uint i = uint(0); i < min(num_lights, MAX_LIGHTS); i++) {
+        vec3 light_position = lights[i].position;
+        vec4 light_color = lights[i].color;
+        float light_power = lights[i].power;
 
-    // diffuse
-    vec3 norm = normalize(normal_camera);
-    vec3 light_direction = normalize(light_position - frag_position_world);
-    float diff = max(dot(norm, light_direction), 0.0);
-    vec4 diffuse = diff * light_color;
+        // ambient
+        vec4 ambient = light_color * light_power * 0.0001;
 
-    // specular
-	vec4 specular_strength = vec4(0.5, 0.5, 0.5, 1.0);
-    vec3 view_direction = normalize(cam_position.xyz - frag_position_world);
-    vec3 reflect_direction = reflect(-light_direction, norm);
-    float spec = pow(max(dot(view_direction, reflect_direction), 0.0), 32.0);
-    vec4 specular = specular_strength * spec * light_color;
+        // diffuse
+        vec3 norm = normalize(normal_camera);
+        vec3 light_direction = normalize(light_position - frag_position_world);
+        float diff = max(dot(norm, light_direction), 0.0);
+        vec4 diffuse = diff * light_color;
 
-	Target0 = (ambient + diffuse + specular) * v_color;
+        // specular
+        vec4 specular_strength = vec4(vec3(light_power * 0.1), 1.0);
+        vec3 view_direction = normalize(cam_position.xyz - frag_position_world);
+        vec3 reflect_direction = reflect(-light_direction, norm);
+        float spec = pow(max(dot(view_direction, reflect_direction), 0.0), 32.0);
+        vec4 specular = specular_strength * spec * light_color;
+
+        v_color *= (ambient + diffuse + specular);
+    }
+
+	Target0 = v_color;
 }
