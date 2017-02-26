@@ -29,7 +29,7 @@ layout (std140) uniform lights_array {
 };
 
 void main() {
-    vec4 v_color = texture(color_texture, v_tex_coord);
+    vec4 total_lighting = vec4(0.0, 0.0, 0.0, 0.0);
 
     for (uint i = uint(0); i < min(num_lights, MAX_LIGHTS); i++) {
         vec3 light_position = lights[i].position;
@@ -52,8 +52,8 @@ void main() {
         float spec = pow(max(dot(view_direction, reflect_direction), 0.0), 32.0);
         vec4 specular = specular_strength * spec * light_color;
 
-        v_color *= (ambient + diffuse + specular);
+        total_lighting += (ambient + diffuse + specular);
     }
 
-	Target0 = v_color;
+	Target0 = texture(color_texture, v_tex_coord) * total_lighting;
 }

@@ -316,12 +316,17 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
         let mvp = projection.to_matrix() * view_mat * model_mat;
-        let light = Light {
-                position: Point3::new(0.0, 0.0001, 4.0),
-                color: [0.1, 0.3, 0.8, 0.8],
-                power: 200.0,
-            }
-            .into();
+        let l0 = Light {
+            position: Point3::new(0.0, 0.0001, 4.0),
+            color: [0.1, 0.3, 0.8, 0.8],
+            power: 200.0,
+        };
+        let l1 = Light {
+            position: Point3::new(2.0, 3.0, -4.0),
+            color: [1.0, 0.0, 0.0, 1.0],
+            power: 250.0,
+        };
+        let lights: [ShaderLight; 2] = [l1.into(), l0.into()];
         encoder.update_constant_buffer(&bundle.data.vert_locals,
                                        &VertLocals {
                                            transform: *(mvp).as_ref(),
@@ -329,9 +334,12 @@ fn main() {
                                            view: *(view_mat).as_ref(),
                                        });
         let cam_pos = [iput.position.x, iput.position.y, iput.position.z, 1.0];
-        encoder.update_constant_buffer(&bundle.data.shared_locals, &SharedLocals { num_lights: 1 });
+        encoder.update_constant_buffer(&bundle.data.shared_locals,
+                                       &SharedLocals {
+                                            num_lights: lights.len() as u32,
+                                       });
         encoder.update_constant_buffer(&bundle.data.camera, &Camera { position: cam_pos });
-        encoder.update_buffer(&bundle.data.lights, &[light], 0).expect("Could not update buffer");
+        encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
         text.draw(&mut encoder, &bundle.data.out).unwrap();
