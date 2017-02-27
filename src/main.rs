@@ -179,15 +179,16 @@ fn main() {
     };
 
     let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
+    let mut bundle = Bundle::new(slice, pso, data);
 
     let mut rot = Rotation3::new(na::zero());
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
-    let mut show_fps = false;
     let mut is_paused = false;
 
-    let mut bundle = Bundle::new(slice, pso, data);
+    let mut show_fps = false;
+    let mut fps_string = String::with_capacity(12); // enough space to display "fps: xxx.yy"
 
     'main: loop {
         let current = PreciseTime::now();
@@ -292,12 +293,6 @@ fn main() {
             continue;
         }
 
-        if show_fps {
-            text.add("The quick brown fox jumps over the lazy dog",
-                     [10, 20],
-                     [0.65, 0.16, 0.16, 1.0]);
-        }
-
         rot = na::append_rotation(&rot,
                                   &Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
 
@@ -343,7 +338,15 @@ fn main() {
         encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
-        text.draw(&mut encoder, &bundle.data.out).unwrap();
+
+        if show_fps {
+            use std::fmt::Write;
+            fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
+            text.add(&fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            text.draw(&mut encoder, &bundle.data.out).unwrap();
+            fps_string.clear();
+        }
+
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
