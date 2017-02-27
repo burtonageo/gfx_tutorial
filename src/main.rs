@@ -189,10 +189,6 @@ fn main() {
 
     let mut bundle = Bundle::new(slice, pso, data);
 
-    // Initial sleep to ensure that everything is initialised before
-    // events are processed.
-    std::thread::sleep(StdDuration::from_millis(30));
-
     'main: loop {
         let current = PreciseTime::now();
         let dt = last.to(current);
