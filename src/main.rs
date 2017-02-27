@@ -315,16 +315,21 @@ fn main() {
         let model_mat = rot.to_homogeneous();
         let mvp = projection.to_matrix() * view_mat * model_mat;
         let l0 = Light {
-            position: Point3::new(0.0, 0.0001, 4.0),
-            color: [0.1, 0.3, 0.8, 0.8],
+            position: Point3::new(0.0, 0.0, 3.0),
+            color: [0.1, 0.1, 1.0, 1.0],
             power: 200.0,
         };
         let l1 = Light {
-            position: Point3::new(2.0, 3.0, -4.0),
+            position: Point3::new(0.0, 0.0, -2.0),
             color: [1.0, 0.0, 0.0, 1.0],
-            power: 250.0,
+            power: 300.0,
         };
-        let lights: [ShaderLight; 2] = [l1.into(), l0.into()];
+        let l2 = Light {
+            position: Point3::new(-3.0, 1.0, 0.0),
+            color: [0.0, 1.0, 0.0, 1.0],
+            power: 80.0,
+        };
+        let lights: [ShaderLight; 3] = [l0.into(), l1.into(), l2.into()];
         encoder.update_constant_buffer(&bundle.data.vert_locals,
                                        &VertLocals {
                                            transform: *(mvp).as_ref(),
