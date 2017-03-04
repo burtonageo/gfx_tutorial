@@ -11,6 +11,7 @@ panic = "abort"
 lto = true
 
 [dependencies]
+alga = "0.5"
 angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
 find_folder = "0.*"
 gfx = "0.14"
@@ -19,7 +20,7 @@ gfx_window_glutin = "0.14"
 glutin = "0.7"
 image = "0.12"
 lazy_static = "0.*"
-nalgebra = "0.10"
+nalgebra = "0.11"
 num = "0.1"
 scopeguard = "0.3"
 time = "0.1"

@@ -1,3 +1,4 @@
+extern crate alga;
 extern crate angular;
 extern crate find_folder;
 #[macro_use]
@@ -24,7 +25,7 @@ use gfx::format::{Depth, Rgba8};
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use load::load_obj;
-use na::{Isometry3, Perspective3, Point3, Rotation3, ToHomogeneous, Vector3};
+use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
 use std::env::args;
 use std::time::Duration as StdDuration;
@@ -85,11 +86,7 @@ struct Input {
 impl Input {
     fn new() -> Self {
         Input {
-            position: Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 10.0,
-            },
+            position: Point3::new(0.0, 0.0, 10.0),
             horizontal_angle: Angle::full(),
             vertical_angle: Angle::zero(),
             fov: Angle::eighth(),
@@ -120,7 +117,7 @@ impl Default for Light {
 
 impl From<Light> for ShaderLight {
     fn from(l: Light) -> Self {
-        let Point3 { x, y, z } = l.position;
+        let na::coordinates::XYZ { x, y, z } = *l.position;
         ShaderLight {
             pos: [x, y, z],
             col: l.color,
@@ -181,7 +178,7 @@ fn main() {
     let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
     let mut bundle = Bundle::new(slice, pso, data);
 
-    let mut rot = Rotation3::new(na::zero());
+    let mut rot = Rotation3::identity();
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
@@ -205,17 +202,13 @@ fn main() {
             std::thread::sleep(sleep_time);
         });
 
-        let direction = Vector3 {
-            x: iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
-            y: iput.vertical_angle.sin(),
-            z: iput.vertical_angle.cos() * iput.horizontal_angle.cos(),
-        };
+        let direction = Vector3::new(iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
+                                     iput.vertical_angle.sin(),
+                                     iput.vertical_angle.cos() * iput.horizontal_angle.cos());
 
-        let right = Vector3 {
-            x: (iput.horizontal_angle - Angle::quarter()).sin(),
-            y: na::zero(),
-            z: (iput.horizontal_angle - Angle::quarter()).cos(),
-        };
+        let right = Vector3::new((iput.horizontal_angle - Angle::quarter()).sin(),
+                                 na::zero(),
+                                 (iput.horizontal_angle - Angle::quarter()).cos());
 
         // Hack to get around lack of resize event on MacOS
         // https://github.com/tomaka/winit/issues/39
@@ -293,13 +286,12 @@ fn main() {
             continue;
         }
 
-        rot = na::append_rotation(&rot,
-                                  &Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
+        rot *= Rotation3::new(Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
 
         let view = {
-            let up = na::cross(&right, &direction);
+            let up = right.cross(&direction);
             Isometry3::look_at_lh(&iput.position,
-                                  &(iput.position.to_vector() + direction).to_point(),
+                                  &PointBase::from_coordinates(iput.position.coords + direction),
                                   &up)
         };
 
@@ -308,7 +300,7 @@ fn main() {
 
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
-        let mvp = projection.to_matrix() * view_mat * model_mat;
+        let mvp = projection.to_homogeneous() * view_mat * model_mat;
         let l0 = Light {
             position: Point3::new(0.0, 0.0, 3.0),
             color: [0.1, 0.1, 1.0, 1.0],
