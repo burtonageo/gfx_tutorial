@@ -1,8 +1,11 @@
+#![feature(conservative_impl_trait)]
+
 extern crate alga;
 extern crate angular;
 extern crate find_folder;
 #[macro_use]
 extern crate gfx;
+extern crate gfx_device_gl;
 extern crate gfx_text;
 extern crate gfx_window_glutin;
 extern crate glutin;
@@ -15,18 +18,28 @@ extern crate nalgebra as na;
 extern crate scopeguard;
 extern crate time;
 extern crate wavefront_obj;
+extern crate winit;
+
+/*
+#[cfg(target_os = "macos")]
+extern crate gfx_window_metal;
+#[cfg(target_os = "macos")]
+extern crate gfx_device_metal;
+*/
 
 mod load;
 mod util;
+mod platform;
 
 use angular::{Angle, Degrees};
-use gfx::{Bundle, Device, Factory};
+use gfx::{Bundle, Device, Factory, Resources};
 use gfx::format::{Depth, Rgba8};
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
+use platform::Window as PlatformWindow;
 use std::env::args;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
@@ -129,14 +142,14 @@ impl From<Light> for ShaderLight {
 const MAX_LIGHTS: usize = 10;
 
 fn main() {
-    let builder = glutin::WindowBuilder::new()
+    let builder = winit::WindowBuilder::new()
         .with_title("Gfx Example")
         .with_dimensions(DEFAULT_WIN_SIZE.0 as u32, DEFAULT_WIN_SIZE.1 as u32)
-        .with_decorations(false)
-        .with_vsync();
+        .with_decorations(false);
 
     let (window, mut device, mut factory, main_color, main_depth) =
-        gfx_window_glutin::init::<Rgba8, Depth>(builder);
+        platform::launch_gl::<Rgba8, Depth>(builder)
+            .expect("Could not create window or graphics device");
 
     window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
     window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
@@ -218,9 +231,7 @@ fn main() {
             let (w, h) = window.get_size_signed_or_default();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    gfx_window_glutin::update_views(&window,
-                                                    &mut bundle.data.out,
-                                                    &mut bundle.data.main_depth);
+                    window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
                     projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
@@ -235,9 +246,7 @@ fn main() {
                 Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
                 #[cfg(not(target_os = "macos"))]
                 Event::Resized(w, h) => {
-                    gfx_window_glutin::update_views(&window,
-                                                    &mut bundle.data.out,
-                                                    &mut bundle.data.main_depth);
+                    window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
                     projection.set_aspect(window.aspect());
                 }
                 Event::MouseMoved(x, y) => {
@@ -345,7 +354,7 @@ fn main() {
     }
 }
 
-trait WindowExt {
+trait WindowExt<R: Resources>: PlatformWindow<R> {
     fn center_cursor(&self) -> Result<(), ()>;
     fn get_size_signed_or_default(&self) -> (i32, i32);
     fn aspect(&self) -> f32 {
@@ -354,7 +363,7 @@ trait WindowExt {
     }
 }
 
-impl WindowExt for glutin::Window {
+impl<R: Resources, W: PlatformWindow<R>> WindowExt<R> for W {
     fn center_cursor(&self) -> Result<(), ()> {
         let (ww, wh) = self.get_size_signed_or_default();
         self.set_cursor_position(ww as i32 / 2, wh as i32 / 2)

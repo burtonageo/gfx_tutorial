@@ -15,6 +15,7 @@ alga = "0.5"
 angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
 find_folder = "0.*"
 gfx = "0.14"
+gfx_device_gl = "0.13"
 gfx_text = "0.15.0"
 gfx_window_glutin = "0.14"
 glutin = "0.7"
@@ -25,3 +26,10 @@ num = "0.1"
 scopeguard = "0.3"
 time = "0.1"
 wavefront_obj = "5.0"
+winit = "0.5.1"
+
+#[target.'cfg(target_os = "macos")'.dependencies.gfx_device_metal]
+#version = "0.1"
+
+#[target.'cfg(target_os = "macos")'.dependencies.gfx_window_metal]
+#version = "0.1"
