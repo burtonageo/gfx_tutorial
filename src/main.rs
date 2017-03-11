@@ -40,7 +40,7 @@ use gfx::traits::FactoryExt;
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
-use platform::Window as PlatformWindow;
+use platform::{Window, WinitWindowExt as PlatformWindow};
 use std::env::args;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
@@ -148,7 +148,7 @@ fn main() {
         .with_dimensions(DEFAULT_WIN_SIZE.0 as u32, DEFAULT_WIN_SIZE.1 as u32)
         .with_decorations(false);
 
-    let (window, mut device, mut factory, main_color, main_depth) =
+    let (_backend, window, mut device, mut factory, main_color, main_depth) =
         platform::launch_gl::<Rgba8, Depth>(builder)
             .expect("Could not create window or graphics device");
 
@@ -240,8 +240,8 @@ fn main() {
             }
         }
 
-        for e in window.poll_events() {
-            use glutin::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
+        for e in window.as_winit_window().poll_events() {
+            use winit::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
             match e {
                 Event::Closed |
                 Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
@@ -367,7 +367,7 @@ trait WindowExt<R: Resources>: PlatformWindow<R> {
 impl<R: Resources, W: PlatformWindow<R>> WindowExt<R> for W {
     fn center_cursor(&self) -> Result<(), ()> {
         let (ww, wh) = self.get_size_signed_or_default();
-        self.set_cursor_position(ww as i32 / 2, wh as i32 / 2)
+        self.as_winit_window().set_cursor_position(ww as i32 / 2, wh as i32 / 2)
     }
 
     fn get_size_signed_or_default(&self) -> (i32, i32) {
@@ -375,6 +375,9 @@ impl<R: Resources, W: PlatformWindow<R>> WindowExt<R> for W {
             (x as i32, y as i32)
         }
 
-        self.get_inner_size().map(u32pair_toi32pair).unwrap_or(DEFAULT_WIN_SIZE)
+        self.as_winit_window()
+            .get_inner_size()
+            .map(u32pair_toi32pair)
+            .unwrap_or(DEFAULT_WIN_SIZE)
     }
 }

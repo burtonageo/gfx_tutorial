@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
 use gfx::{Device, Factory, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use std::error::Error;
 use std::fmt;
 use void::Void;
-use winit::{self, WindowBuilder};
+use winit;
 
 mod gl;
 pub use self::gl::launch_gl;
@@ -21,24 +23,18 @@ pub trait Window<R: Resources> {
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError>;
 
     fn update_views<C: RenderFormat, D: DepthFormat>(&self,
-                                                     rtv: &mut RenderTargetView<R, C>,
-                                                     dsv: &mut DepthStencilView<R, D>);
+                                                     _rtv: &mut RenderTargetView<R, C>,
+                                                     _dsv: &mut DepthStencilView<R, D>) { }
+}
 
-    fn set_title(&self, title: &str);
-    fn show(&self);
-    fn hide(&self);
-    fn get_position(&self) -> Option<(i32, i32)>;
-    fn set_position(&self, x: i32, y: i32);
-    fn get_inner_size(&self) -> Option<(u32, u32)>;
-    fn get_inner_size_points(&self) -> Option<(u32, u32)>;
-    fn get_inner_size_pixels(&self) -> Option<(u32, u32)>;
-    fn set_inner_size(&self, x: u32, y: u32);
-    fn hidpi_factor(&self) -> f32;
-    fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()>;
+pub trait WinitWindowExt<R: Resources>: Window<R> {
+    fn as_winit_window(&self) -> &winit::Window;
+    fn as_winit_window_mut(&mut self) -> &mut winit::Window;
 }
 
 pub fn launch_native<C, D>(wb: winit::WindowBuilder)
-                           -> Result<(impl Window<impl Resources>,
+                           -> Result<(Backend,
+                                      impl WinitWindowExt<impl Resources>,
                                       impl Device,
                                       impl Factory<impl Resources>,
                                       RenderTargetView<impl Resources, C>,
@@ -85,8 +81,64 @@ impl From<Void> for LaunchError {
     }
 }
 
-pub enum Backend {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Backend(BackendInner);
+
+impl Backend {
+    #[inline]
+    pub fn gl() -> Self {
+        Backend(BackendInner::Gl)
+    }
+
+    #[inline]
+    pub fn metal() -> Self {
+        Backend(BackendInner::Metal)
+    }
+
+    #[inline]
+    pub fn d3d11() -> Self {
+        Backend(BackendInner::D3d11)
+    }
+
+    pub fn select<'a>(&self, _shaders: Shaders<'a>) -> ShaderPipeline<'a> {
+        use self::BackendInner::*;
+        match self.0 {
+            Gl => unimplemented!(),
+            Metal => unimplemented!(),
+            D3d11 => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum BackendInner {
     Gl,
     Metal,
     D3d11,
 }
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Shaders<'a> {
+    D3d11(ShaderPipeline<'a>),
+    Glsl150(ShaderPipeline<'a>),
+    Glsl120(ShaderPipeline<'a>),
+    Metal(ShaderPipeline<'a>),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ShaderPipeline<'a> {
+    Simple { vertex: &'a [u8], pixel: &'a [u8] },
+    Geometry {
+        vertex: &'a [u8],
+        geometry: &'a [u8],
+        pixel: &'a [u8]
+    },
+    Full {
+        vertex: &'a [u8],
+        tess_control: &'a [u8],
+        tess_evaluation: &'a [u8],
+        geometry: &'a [u8],
+        pixel: &'a [u8],
+    },
+}
+

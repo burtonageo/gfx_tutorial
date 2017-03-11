@@ -1,11 +1,11 @@
-use super::Window;
+use super::{Backend, Window, WinitWindowExt};
 use gfx_device_gl::{Device, Factory, Resources};
 use gfx_window_glutin;
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use glutin::{ContextError, Window as GlutinWindow, WindowBuilder as GlutinWindowBuilder};
 use void::Void;
-use winit::WindowBuilder;
+use winit;
 
 impl Window<Resources> for GlutinWindow {
     type SwapBuffersError = ContextError;
@@ -23,65 +23,21 @@ impl Window<Resources> for GlutinWindow {
               D: DepthFormat {
         gfx_window_glutin::update_views(&self, rtv, dsv)
     }
+}
 
-    #[inline]
-    fn set_title(&self, title: &str) {
-        GlutinWindow::set_title(self, title)
+impl WinitWindowExt<Resources> for GlutinWindow {
+    fn as_winit_window(&self) -> &winit::Window {
+        self.as_winit_window()
     }
 
-    #[inline]
-    fn show(&self) {
-        GlutinWindow::show(self)
-    }
-
-    #[inline]
-    fn hide(&self) {
-        GlutinWindow::hide(self)
-    }
-
-    #[inline]
-    fn get_position(&self) -> Option<(i32, i32)> {
-        GlutinWindow::get_position(self)
-    }
-
-    #[inline]
-    fn set_position(&self, x: i32, y: i32) {
-        GlutinWindow::set_position(self, x, y)
-    }
-
-    #[inline]
-    fn get_inner_size(&self) -> Option<(u32, u32)> {
-        GlutinWindow::get_inner_size(self)
-    }
-
-    #[inline]
-    fn get_inner_size_points(&self) -> Option<(u32, u32)> {
-        GlutinWindow::get_inner_size_points(self)
-    }
-
-    #[inline]
-    fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
-        GlutinWindow::get_inner_size_pixels(self)
-    }
-
-    #[inline]
-    fn set_inner_size(&self, x: u32, y: u32) {
-        GlutinWindow::set_inner_size(self, x, y)
-    }
-
-    #[inline]
-    fn hidpi_factor(&self) -> f32 {
-        GlutinWindow::hidpi_factor(self)
-    }
-
-    #[inline]
-    fn set_cursor_position(&self, x: i32, y: i32)  -> Result<(), ()> {
-        GlutinWindow::set_cursor_position(self, x, y)
+    fn as_winit_window_mut(&mut self) -> &mut winit::Window {
+        self.as_winit_window_mut()
     }
 }
 
-pub fn launch_gl<C, D>(wb: WindowBuilder)
-                       -> Result<(GlutinWindow,
+pub fn launch_gl<C, D>(wb: winit::WindowBuilder)
+                       -> Result<(Backend,
+                                  GlutinWindow,
                                   Device,
                                   Factory,
                                   RenderTargetView<Resources, C>,
@@ -89,5 +45,6 @@ pub fn launch_gl<C, D>(wb: WindowBuilder)
                                  Void>
     where C: RenderFormat,
           D: DepthFormat {
-    Ok(gfx_window_glutin::init(GlutinWindowBuilder::from_winit_builder(wb)))
+    let (w, d, f, rtv, dst) = gfx_window_glutin::init(GlutinWindowBuilder::from_winit_builder(wb));
+    Ok((Backend::gl(), w, d, f, rtv, dst))
 }
