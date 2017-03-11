@@ -25,6 +25,7 @@ nalgebra = "0.11"
 num = "0.1"
 scopeguard = "0.3"
 time = "0.1"
+void = "1.0.2"
 wavefront_obj = "5.0"
 winit = "0.5.1"
 

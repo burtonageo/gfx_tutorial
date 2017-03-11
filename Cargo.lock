@@ -16,6 +16,7 @@ dependencies = [
  "num 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "scopeguard 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "wavefront_obj 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winit 0.5.11 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -793,6 +794,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "void"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "wavefront_obj"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -996,6 +1002,7 @@ dependencies = [
 "checksum time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)" = "211b63c112206356ef1ff9b19355f43740fc3f85960c598a93d3a3d3ba7beade"
 "checksum typenum 1.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "67487cf4cca391384ecd9f42d786ea8334ca476b7030252e5175909c84bba9e2"
 "checksum user32-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6717129de5ac253f5642fc78a51d0c7de6f9f53d617fc94e9bae7f6e71cf5504"
+"checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum wavefront_obj 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fe5d777ffea014fe243a327fde7c543c55683a5d59d5daedfe366143258ef396"
 "checksum wayland-client 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)" = "a4b2b9876c6c97ece4f1ac699b5172550df443f36942fdcdcc27768c8f1437b4"
 "checksum wayland-kbd 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2b4b69d43d6cce82d95a2c5e81605abd1fa4783bf49d09cd85aa092f16081ef1"

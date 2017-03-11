@@ -1,22 +1,28 @@
 use gfx::{Device, Factory, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
-use gfx_device_gl::{Device as GlDevice, Factory as GlFactory, Resources as GlResources};
-use winit;
+use std::error::Error;
+use std::fmt;
+use void::Void;
+use winit::{self, WindowBuilder};
 
 mod gl;
-
 pub use self::gl::launch_gl;
 
+/*
+#[cfg(target_os = "macos")]
+mod metal;
+#[cfg(target_os = "macos")]
+use self::metal::launch_metal as launch_native;
+*/
+
 pub trait Window<R: Resources> {
-    type SwapBuffersError;
+    type SwapBuffersError: Error;
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError>;
 
-    fn update_views<C, D>(&self,
-                          rtv: &mut RenderTargetView<R, C>,
-                          dsv: &mut DepthStencilView<R, D>)
-        where C: RenderFormat,
-              D: DepthFormat;
+    fn update_views<C: RenderFormat, D: DepthFormat>(&self,
+                                                     rtv: &mut RenderTargetView<R, C>,
+                                                     dsv: &mut DepthStencilView<R, D>);
 
     fn set_title(&self, title: &str);
     fn show(&self);
@@ -31,14 +37,6 @@ pub trait Window<R: Resources> {
     fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()>;
 }
 
-/*
-#[cfg(target_os = "macos")]
-mod metal;
-*/
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct LaunchError;
-
 pub fn launch_native<C, D>(wb: winit::WindowBuilder)
                            -> Result<(impl Window<impl Resources>,
                                       impl Device,
@@ -48,30 +46,47 @@ pub fn launch_native<C, D>(wb: winit::WindowBuilder)
                                      LaunchError>
     where C: RenderFormat,
           D: DepthFormat {
-    launch_gl(wb)
+    Ok(launch_gl(wb)?)
 }
 
-pub struct LaunchNativeError;
+#[derive(Debug)]
+pub struct LaunchError(Box<Error>);
 
-pub enum NativeOrGlFallback<R, W, D, F, GlW, Cf, Df>
-    where R: Resources,
-          W: Window<R>,
-          D: Device,
-          F: Factory<R>,
-          GlW: Window<GlResources>,
-          Cf: RenderFormat,
-          Df: DepthFormat
-{
-    Native(W, D, F, RenderTargetView<R, Cf>, DepthStencilView<R, Df>),
-    GlFallback {
-        native_launch_error: LaunchError,
-        fallback: (GlW, GlDevice, GlFactory,
-                   RenderTargetView<GlResources, Cf>,
-                   DepthStencilView<GlResources, Df>),
+impl fmt::Display for LaunchError {
+    #[inline]
+    fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self.0.as_ref(), fmtr)
+    }
+}
+
+impl Error for LaunchError {
+    #[inline]
+    fn description(&self) -> &str {
+        "could not create gfx window or GPU connection"
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&Error> {
+        Some(self.0.as_ref())
+    }
+}
+
+impl From<Box<Error>> for LaunchError {
+    #[inline]
+    fn from(e: Box<Error>) -> LaunchError {
+        LaunchError(e)
+    }
+}
+
+impl From<Void> for LaunchError {
+    #[cold]
+    fn from(_: Void) -> LaunchError {
+        unreachable!()
     }
 }
 
 pub enum Backend {
     Gl,
     Metal,
+    D3d11,
 }

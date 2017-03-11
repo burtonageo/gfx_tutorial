@@ -17,6 +17,7 @@ extern crate nalgebra as na;
 #[macro_use]
 extern crate scopeguard;
 extern crate time;
+extern crate void;
 extern crate wavefront_obj;
 extern crate winit;
 

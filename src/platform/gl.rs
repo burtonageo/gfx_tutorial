@@ -4,6 +4,7 @@ use gfx_window_glutin;
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use glutin::{ContextError, Window as GlutinWindow, WindowBuilder as GlutinWindowBuilder};
+use void::Void;
 use winit::WindowBuilder;
 
 impl Window<Resources> for GlutinWindow {
@@ -85,7 +86,7 @@ pub fn launch_gl<C, D>(wb: WindowBuilder)
                                   Factory,
                                   RenderTargetView<Resources, C>,
                                   DepthStencilView<Resources, D>),
-                                 LaunchError>
+                                 Void>
     where C: RenderFormat,
           D: DepthFormat {
     let builder = GlutinWindowBuilder::from_winit_builder(wb);
