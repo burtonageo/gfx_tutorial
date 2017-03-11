@@ -1,4 +1,4 @@
-use super::{LaunchError, Window};
+use super::Window;
 use gfx_device_gl::{Device, Factory, Resources};
 use gfx_window_glutin;
 use gfx::format::{DepthFormat, RenderFormat};
@@ -89,7 +89,5 @@ pub fn launch_gl<C, D>(wb: WindowBuilder)
                                  Void>
     where C: RenderFormat,
           D: DepthFormat {
-    let builder = GlutinWindowBuilder::from_winit_builder(wb);
-    let (window, device, factory, main_color, main_depth) = gfx_window_glutin::init(builder);
-    Ok((window, device, factory, main_color, main_depth))
+    Ok(gfx_window_glutin::init(GlutinWindowBuilder::from_winit_builder(wb)))
 }
