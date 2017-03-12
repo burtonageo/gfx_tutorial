@@ -14,10 +14,10 @@ lto = true
 alga = "0.5"
 angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
 find_folder = "0.*"
-gfx = "0.14"
-gfx_device_gl = "0.13"
-gfx_text = "0.15.0"
-gfx_window_glutin = "0.14"
+gfx = { version = "0.14", path = "./vendor/gfx/src/render" }
+gfx_device_gl = { version = "0.13", path = "./vendor/gfx/src/backend/gl" }
+gfx_text = "0.15"
+gfx_window_glutin = { version = "0.14", path = "./vendor/gfx/src/window/glutin" }
 glutin = "0.7"
 image = "0.12"
 lazy_static = "0.*"
@@ -29,8 +29,10 @@ void = "1.0.2"
 wavefront_obj = "5.0"
 winit = "0.5.1"
 
-#[target.'cfg(target_os = "macos")'.dependencies.gfx_device_metal]
-#version = "0.1"
+[target.'cfg(target_os = "macos")'.dependencies.gfx_device_metal]
+version = "0.1"
+path = "./vendor/gfx/src/backend/metal"
 
-#[target.'cfg(target_os = "macos")'.dependencies.gfx_window_metal]
-#version = "0.1"
+[target.'cfg(target_os = "macos")'.dependencies.gfx_window_metal]
+version = "0.1"
+path = "./vendor/gfx/src/window/metal"

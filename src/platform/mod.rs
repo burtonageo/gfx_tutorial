@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use gfx::{Device, Factory, Resources};
+use gfx::{CommandBuffer, Encoder, Factory, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use std::error::Error;
@@ -9,12 +9,15 @@ use winit;
 mod gl;
 pub use self::gl::launch_gl;
 
-/*
 #[cfg(target_os = "macos")]
 mod metal;
 #[cfg(target_os = "macos")]
-use self::metal::launch_metal as launch_native;
-*/
+pub use self::metal::launch_metal;
+#[cfg(target_os = "macos")]
+pub use self::metal::launch_metal as launch_native;
+
+#[cfg(not(target_os = "macos"))]
+pub use self::gl::launch_gl as launch_native;
 
 pub trait Window<R: Resources> {
     type SwapBuffersError: Error;
@@ -27,21 +30,30 @@ pub trait Window<R: Resources> {
 
 pub trait WinitWindowExt<R: Resources>: Window<R> {
     fn as_winit_window(&self) -> &winit::Window;
-    fn as_winit_window_mut(&mut self) -> &mut winit::Window;
 }
 
+pub trait FactoryExt<R: Resources>: Factory<R> {
+    type CommandBuffer: CommandBuffer<R>;
+    fn create_encoder(&mut self) -> Encoder<R, Self::CommandBuffer>;
+}
+/*
 pub fn launch_native<C, D>(wb: winit::WindowBuilder)
                            -> Result<(Backend,
                                       impl WinitWindowExt<impl Resources>,
                                       impl Device,
-                                      impl Factory<impl Resources>,
+                                      impl FactoryExt<impl Resources>,
                                       RenderTargetView<impl Resources, C>,
                                       DepthStencilView<impl Resources, D>),
                                      impl Error>
     where C: RenderFormat,
-          D: DepthFormat {
-    launch_gl(wb)
+          D: DepthFormat,
+          <D as Formatted>::Channel: TextureChannel,
+          <D as Formatted>::Surface: TextureSurface {
+    #[cfg(target_os = "macos")] { self::metal::launch_metal(wb) }
+
+    #[cfg(not(target_os = "macos"))] { launch_gl(wb) }
 }
+*/
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Backend {

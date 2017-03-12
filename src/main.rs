@@ -6,7 +6,7 @@ extern crate find_folder;
 #[macro_use]
 extern crate gfx;
 extern crate gfx_device_gl;
-extern crate gfx_text;
+// extern crate gfx_text;
 extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate image;
@@ -21,12 +21,10 @@ extern crate void;
 extern crate wavefront_obj;
 extern crate winit;
 
-/*
 #[cfg(target_os = "macos")]
 extern crate gfx_window_metal;
 #[cfg(target_os = "macos")]
 extern crate gfx_device_metal;
-*/
 
 mod load;
 mod util;
@@ -34,13 +32,13 @@ mod platform;
 
 use angular::{Angle, Degrees};
 use gfx::{Bundle, Device, Factory, Resources};
-use gfx::format::{Depth, Rgba8};
+use gfx::format::Rgba8;
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
-use platform::{Window, WinitWindowExt as PlatformWindow};
+use platform::{FactoryExt as PlFactoryExt, Window, WinitWindowExt as PlatformWindow};
 use std::env::args;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
@@ -81,7 +79,7 @@ gfx_defines! {
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
         camera: gfx::ConstantBuffer<Camera> = "main_camera",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
-        main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
+        main_depth: gfx::DepthTarget<gfx::format::Depth32F> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
 }
 
@@ -149,14 +147,16 @@ fn main() {
         .with_decorations(false);
 
     let (_backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_gl::<Rgba8, Depth>(builder)
+        platform::launch_gl::<Rgba8, gfx::format::Depth32F>(builder)
             .expect("Could not create window or graphics device");
 
-    window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
-    window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
+    window.as_winit_window().set_cursor_state(winit::CursorState::Hide)
+        .expect("Could not set cursor state");
+    window.as_winit_window().set_cursor_state(winit::CursorState::Grab)
+        .expect("Could not set cursor state");
     window.center_cursor().expect("Could not set cursor position");
 
-    let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
+    let mut encoder = factory.create_encoder();
     let program = factory.link_program(VERT_SRC, FRAG_SRC).unwrap();
     let pso = factory.create_pipeline_from_program(&program,
                                       gfx::Primitive::TriangleList,
@@ -189,7 +189,7 @@ fn main() {
         main_depth: main_depth,
     };
 
-    let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
+    // let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
     let mut bundle = Bundle::new(slice, pso, data);
 
     let mut rot = Rotation3::identity();
@@ -336,8 +336,9 @@ fn main() {
         if show_fps {
             use std::fmt::Write;
             fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
-            text.add(&fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
-            text.draw(&mut encoder, &bundle.data.out).unwrap();
+            //text.add(&fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            //text.draw(&mut encoder, &bundle.data.out).unwrap();
+            println!("{}", fps_string);
             fps_string.clear();
         }
 

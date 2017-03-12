@@ -1,6 +1,7 @@
-use super::{Backend, Window, WinitWindowExt};
-use gfx_device_gl::{Device, Factory, Resources};
+use super::{Backend, FactoryExt, Window, WinitWindowExt};
+use gfx_device_gl::{CommandBuffer, Device, Factory, Resources};
 use gfx_window_glutin;
+use gfx::Encoder;
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use glutin::{ContextError, Window as GlutinWindow, WindowBuilder as GlutinWindowBuilder};
@@ -29,9 +30,13 @@ impl WinitWindowExt<Resources> for GlutinWindow {
     fn as_winit_window(&self) -> &winit::Window {
         self.as_winit_window()
     }
+}
 
-    fn as_winit_window_mut(&mut self) -> &mut winit::Window {
-        self.as_winit_window_mut()
+impl FactoryExt<Resources> for Factory {
+    type CommandBuffer = CommandBuffer;
+
+    fn create_encoder(&mut self) -> Encoder<Resources, Self::CommandBuffer> {
+        self.create_command_buffer().into()
     }
 }
 
