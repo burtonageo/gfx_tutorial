@@ -150,10 +150,7 @@ fn main() {
         platform::launch_gl::<Rgba8, gfx::format::Depth32F>(builder)
             .expect("Could not create window or graphics device");
 
-    window.as_winit_window().set_cursor_state(winit::CursorState::Hide)
-        .expect("Could not set cursor state");
-    window.as_winit_window().set_cursor_state(winit::CursorState::Grab)
-        .expect("Could not set cursor state");
+    window.hide_and_grab_cursor().expect("Could not set cursor state");
     window.center_cursor().expect("Could not set cursor position");
 
     let mut encoder = factory.create_encoder();
@@ -350,6 +347,7 @@ fn main() {
 
 trait WindowExt<R: Resources>: PlatformWindow<R> {
     fn center_cursor(&self) -> Result<(), ()>;
+    fn hide_and_grab_cursor(&self) -> Result<(), String>;
     fn get_size_signed_or_default(&self) -> (i32, i32);
     fn aspect(&self) -> f32 {
         let (w, h) = self.get_size_signed_or_default();
@@ -361,6 +359,11 @@ impl<R: Resources, W: PlatformWindow<R>> WindowExt<R> for W {
     fn center_cursor(&self) -> Result<(), ()> {
         let (ww, wh) = self.get_size_signed_or_default();
         self.as_winit_window().set_cursor_position(ww as i32 / 2, wh as i32 / 2)
+    }
+
+    fn hide_and_grab_cursor(&self) -> Result<(), String> {
+        self.as_winit_window().set_cursor_state(winit::CursorState::Hide)?;
+        self.as_winit_window().set_cursor_state(winit::CursorState::Grab)
     }
 
     fn get_size_signed_or_default(&self) -> (i32, i32) {
