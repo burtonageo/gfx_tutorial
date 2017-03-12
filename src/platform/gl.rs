@@ -46,5 +46,5 @@ pub fn launch_gl<C, D>(wb: winit::WindowBuilder)
     where C: RenderFormat,
           D: DepthFormat {
     let (w, d, f, rtv, dst) = gfx_window_glutin::init(GlutinWindowBuilder::from_winit_builder(wb));
-    Ok((Backend::gl(), w, d, f, rtv, dst))
+    Ok((Backend::Gl, w, d, f, rtv, dst))
 }

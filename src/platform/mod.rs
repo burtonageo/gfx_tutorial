@@ -4,8 +4,6 @@ use gfx::{Device, Factory, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use std::error::Error;
-use std::fmt;
-use void::Void;
 use winit;
 
 mod gl;
@@ -39,90 +37,39 @@ pub fn launch_native<C, D>(wb: winit::WindowBuilder)
                                       impl Factory<impl Resources>,
                                       RenderTargetView<impl Resources, C>,
                                       DepthStencilView<impl Resources, D>),
-                                     LaunchError>
+                                     impl Error>
     where C: RenderFormat,
           D: DepthFormat {
-    Ok(launch_gl(wb)?)
-}
-
-#[derive(Debug)]
-pub struct LaunchError(Box<Error>);
-
-impl fmt::Display for LaunchError {
-    #[inline]
-    fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(self.0.as_ref(), fmtr)
-    }
-}
-
-impl Error for LaunchError {
-    #[inline]
-    fn description(&self) -> &str {
-        "could not create gfx window or GPU connection"
-    }
-
-    #[inline]
-    fn cause(&self) -> Option<&Error> {
-        Some(self.0.as_ref())
-    }
-}
-
-impl From<Box<Error>> for LaunchError {
-    #[inline]
-    fn from(e: Box<Error>) -> LaunchError {
-        LaunchError(e)
-    }
-}
-
-impl From<Void> for LaunchError {
-    #[cold]
-    fn from(_: Void) -> LaunchError {
-        unreachable!()
-    }
+    launch_gl(wb)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Backend(BackendInner);
+pub enum Backend {
+    Gl,
+    Metal,
+    D3d11,
+    #[doc(hidden)]
+    __NonexhaustiveCheck,
+}
 
 impl Backend {
-    #[inline]
-    pub fn gl() -> Self {
-        Backend(BackendInner::Gl)
-    }
-
-    #[inline]
-    pub fn metal() -> Self {
-        Backend(BackendInner::Metal)
-    }
-
-    #[inline]
-    pub fn d3d11() -> Self {
-        Backend(BackendInner::D3d11)
-    }
-
-    pub fn select<'a>(&self, _shaders: Shaders<'a>) -> ShaderPipeline<'a> {
-        use self::BackendInner::*;
-        match self.0 {
-            Gl => unimplemented!(),
-            Metal => unimplemented!(),
-            D3d11 => unimplemented!(),
+    pub fn select<'a>(&self, shaders: Shaders<'a>) -> ShaderPipeline<'a> {
+        use self::Backend::*;
+        match *self {
+            Gl => shaders.glsl150,
+            Metal => shaders.metal,
+            D3d11 => shaders.d3d11,
+            _ => unreachable!(),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum BackendInner {
-    Gl,
-    Metal,
-    D3d11,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Shaders<'a> {
-    D3d11(ShaderPipeline<'a>),
-    Glsl150(ShaderPipeline<'a>),
-    Glsl120(ShaderPipeline<'a>),
-    Metal(ShaderPipeline<'a>),
+pub struct Shaders<'a> {
+    pub d3d11: ShaderPipeline<'a>,
+    pub glsl150: ShaderPipeline<'a>,
+    pub glsl120: ShaderPipeline<'a>,
+    pub metal: ShaderPipeline<'a>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
