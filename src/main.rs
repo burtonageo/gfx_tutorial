@@ -241,7 +241,7 @@ fn main() {
         }
 
         for e in window.as_winit_window().poll_events() {
-            use winit::{ElementState, Event, MouseScrollDelta, VirtualKeyCode};
+            use winit::{ElementState, Event, VirtualKeyCode};
             match e {
                 Event::Closed |
                 Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
@@ -275,14 +275,6 @@ fn main() {
                 }
                 Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::Space)) => {
                     show_fps = !show_fps;
-                }
-                Event::MouseWheel(delta, _) => {
-                    let dy = match delta {
-                        MouseScrollDelta::LineDelta(_, y) => y,
-                        MouseScrollDelta::PixelDelta(_, y) => y,
-                    };
-                    iput.fov = (iput.fov + Angle::Degrees(dy / 5.0)).normalized();
-                    projection.set_fovy(iput.fov.in_radians());
                 }
                 Event::Focused(gained) => {
                     is_paused = !gained;
