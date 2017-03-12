@@ -23,11 +23,11 @@ pub fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
     let mut obj_string = String::new();
     let mut obj_file_name = get_assets_folder().unwrap().to_path_buf();
     obj_file_name.push(&format!("mesh/{}.obj", obj_name));
-    let mut obj_file = File::open(obj_file_name).expect("Could not open suzanne.obj");
-    obj_file.read_to_string(&mut obj_string).expect("Could not read suzanne.obj");
+    let mut obj_file = File::open(obj_file_name).expect(&format!("Could not open {}.obj", obj_name));
+    obj_file.read_to_string(&mut obj_string).expect(&format!("Could not read {}.obj", obj_name));
     drop(obj_file);
 
-    let obj = obj::parse(obj_string).expect("Could not parse suzanne.obj");
+    let obj = obj::parse(obj_string).expect(&format!("Could not parse {}.obj", obj_name));
     let object = obj.objects.get(0).expect("No objects");
 
     let mut verts = Vec::new();
