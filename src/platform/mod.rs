@@ -12,11 +12,14 @@ pub use self::gl::launch_gl;
 #[cfg(target_os = "macos")]
 mod metal;
 #[cfg(target_os = "macos")]
-pub use self::metal::launch_metal;
-#[cfg(target_os = "macos")]
 pub use self::metal::launch_metal as launch_native;
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+mod dx11;
+#[cfg(target_os = "windows")]
+pub use self::metal::launch_dx11 as launch_native;
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub use self::gl::launch_gl as launch_native;
 
 pub trait Window<R: Resources> {
@@ -36,35 +39,42 @@ pub trait FactoryExt<R: Resources>: Factory<R> {
     type CommandBuffer: CommandBuffer<R>;
     fn create_encoder(&mut self) -> Encoder<R, Self::CommandBuffer>;
 }
-/*
-pub fn launch_native<C, D>(wb: winit::WindowBuilder)
-                           -> Result<(Backend,
-                                      impl WinitWindowExt<impl Resources>,
-                                      impl Device,
-                                      impl FactoryExt<impl Resources>,
-                                      RenderTargetView<impl Resources, C>,
-                                      DepthStencilView<impl Resources, D>),
-                                     impl Error>
-    where C: RenderFormat,
-          D: DepthFormat,
-          <D as Formatted>::Channel: TextureChannel,
-          <D as Formatted>::Surface: TextureSurface {
-    #[cfg(target_os = "macos")] { self::metal::launch_metal(wb) }
-
-    #[cfg(not(target_os = "macos"))] { launch_gl(wb) }
-}
-*/
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Backend {
     Gl,
     Metal,
     D3d11,
+    Vulkan,
     #[doc(hidden)]
     __NonexhaustiveCheck,
 }
 
 impl Backend {
+    pub fn is_gl(&self) -> bool {
+        if let Backend::Gl = *self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_metal(&self) -> bool {
+        if let Backend::Metal = *self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_d3d11(&self) -> bool {
+        if let Backend::D3d11 = *self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn select<'a>(&self, shaders: Shaders<'a>) -> ShaderPipeline<'a> {
         use self::Backend::*;
         match *self {

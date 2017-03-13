@@ -26,6 +26,11 @@ extern crate gfx_window_metal;
 #[cfg(target_os = "macos")]
 extern crate gfx_device_metal;
 
+#[cfg(target_os = "windows")]
+extern crate gfx_window_dxgi;
+#[cfg(target_os = "windows")]
+extern crate gfx_device_dx11;
+
 mod load;
 mod util;
 mod platform;
