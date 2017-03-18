@@ -109,7 +109,7 @@ impl Input {
     fn new() -> Self {
         Input {
             position: Point3::new(0.0, 0.0, 10.0),
-            horizontal_angle: Angle::full(),
+            horizontal_angle: Angle::zero(),
             vertical_angle: Angle::zero(),
             fov: Angle::eighth(),
         }
@@ -264,9 +264,12 @@ fn main() {
                 }
                 Event::MouseMoved(x, y) => {
                     let (ww, wh) = window.get_size_signed_or_default();
+                    let hidpi = window.as_winit_window().hidpi_factor() as i32;
 
-                    iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
-                    iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y) as f32);
+                    iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - (x / hidpi)) as f32);
+                    iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - (y / hidpi)) as f32);
+
+                    iput.horizontal_angle = iput.horizontal_angle.normalized();
 
                     let threshold = Angle::quarter() - Degrees(1.0f32);
 
