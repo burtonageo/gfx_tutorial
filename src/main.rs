@@ -1,7 +1,7 @@
 #![feature(conservative_impl_trait)]
 
 extern crate alga;
-extern crate angular;
+extern crate ang;
 extern crate find_folder;
 #[macro_use]
 extern crate gfx;
@@ -35,7 +35,7 @@ mod load;
 mod util;
 mod platform;
 
-use angular::{Angle, Degrees};
+use ang::{Angle, Degrees};
 use gfx::{Bundle, Device, Factory, Resources};
 use gfx::format::Rgba8;
 use gfx::texture::{AaMode, Kind};
@@ -45,6 +45,7 @@ use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
 use platform::{FactoryExt as PlFactoryExt, Window, WinitWindowExt as PlatformWindow};
 use std::env::args;
+use std::ops::Neg;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
 use util::get_assets_folder;
@@ -258,8 +259,15 @@ fn main() {
                     iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
                     iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y) as f32);
 
-                    iput.horizontal_angle = iput.horizontal_angle.normalized();
-                    iput.vertical_angle = iput.vertical_angle.normalized();
+                    let threshold = Angle::quarter() - Degrees(1.0f32);
+
+                    if iput.vertical_angle > threshold {
+                        iput.vertical_angle = threshold;
+                    }
+
+                    if iput.vertical_angle < threshold.neg() {
+                        iput.vertical_angle = threshold.neg();
+                    }
 
                     window.center_cursor().expect("Could not set cursor position");
                 }
