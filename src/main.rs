@@ -88,8 +88,12 @@ gfx_defines! {
     }
 }
 
-const VERT_SRC: &'static [u8] = include_bytes!("../data/shader/standard.vs");
-const FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/standard.fs");
+const GLSL_VERT_SRC: &'static [u8] = include_bytes!("../data/shader/glsl/standard.vs");
+const GLSL_FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/glsl/standard.fs");
+
+const MSL_VERT_SRC: &'static [u8] = include_bytes!("../data/shader/msl/standard.vs");
+const MSL_FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/msl/standard.fs");
+
 const CLEAR_COLOR: [f32; 4] = [0.005, 0.005, 0.1, 1.0];
 
 #[derive(Debug)]
@@ -151,15 +155,20 @@ fn main() {
         .with_dimensions(DEFAULT_WIN_SIZE.0 as u32, DEFAULT_WIN_SIZE.1 as u32)
         .with_decorations(false);
 
-    let (_backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_gl::<Rgba8, gfx::format::Depth32F>(builder)
+    let (backend, window, mut device, mut factory, main_color, main_depth) =
+        platform::launch_native::<Rgba8, gfx::format::Depth32F>(builder)
             .expect("Could not create window or graphics device");
 
     window.hide_and_grab_cursor().expect("Could not set cursor state");
     window.center_cursor().expect("Could not set cursor position");
 
     let mut encoder = factory.create_encoder();
-    let program = factory.link_program(VERT_SRC, FRAG_SRC).unwrap();
+    let program = if backend.is_gl() {
+        factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
+    } else {
+        factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
+    };
+
     let pso = factory.create_pipeline_from_program(&program,
                                       gfx::Primitive::TriangleList,
                                       gfx::state::Rasterizer::new_fill().with_cull_back(),
