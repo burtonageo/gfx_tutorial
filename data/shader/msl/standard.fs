@@ -14,12 +14,11 @@ struct FragmentOut {
 };
 
 fragment FragmentOut frag(VertexOutput vertices          [[stage_in]],
-                          texture2d<float> color_texture [[texture(0)]]
-                          // sampler color_texture_sampler  [[sampler(0)]]
-                          ) {
+                          texture2d<float> color_texture [[texture(0)]],
+                          sampler color_texture_         [[sampler(0)]]) {
 	FragmentOut out;
 
-	float4 frag_col = color_texture.read(uint2(vertices.uv));
+	float4 frag_col = color_texture.sample(color_texture_, vertices.uv);
 	out.main = frag_col;
 
 	return out;
