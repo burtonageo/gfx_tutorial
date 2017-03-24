@@ -12,7 +12,7 @@ lto = true
 
 [dependencies]
 alga = "0.5"
-ang = "0.1"
+ang = "0.2"
 find_folder = "0.*"
 gfx = { version = "0.14", path = "./vendor/gfx/src/render" }
 gfx_device_gl = { version = "0.13", path = "./vendor/gfx/src/backend/gl" }

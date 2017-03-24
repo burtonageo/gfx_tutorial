@@ -3,7 +3,7 @@ name = "gfx_tutorial"
 version = "0.1.0"
 dependencies = [
  "alga 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "ang 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ang 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "find_folder 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gfx 0.14.0",
  "gfx_device_dx11 0.5.0",
@@ -47,7 +47,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "ang"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1064,7 +1064,7 @@ dependencies = [
 "checksum adler32 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3ff33fe13a08dbce05bcefa2c68eea4844941437e33d6f808240b54d7157b9cd"
 "checksum alga 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ac1e4aec8a55e9150c6941e3c1059272b8e607c0503f9b61ca12289e56efb87b"
 "checksum android_glue 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d8289e9637439939cc92b1995b0972117905be88bc28116c86b64d6e589bcd38"
-"checksum ang 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "361a7d54d2005ec83fb6f3cd67a2e25b550946880776d78fcbfe369c23f52d57"
+"checksum ang 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5aacfb455c4709edef7982d4cd2f7ea7805e206f8b3de45823a6a6fca158c43"
 "checksum approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "08abcc3b4e9339e33a3d0a5ed15d84a687350c05689d825e0f6655eef9e76a94"
 "checksum bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d9bf6104718e80d7b26a68fdbacff3481cfc05df670821affc7e9cbc1884400c"
 "checksum bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5b97c2c8e8bbb4251754f559df8af22fb264853c7d009084a576cdf12565089d"
