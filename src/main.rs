@@ -14,6 +14,7 @@ extern crate image;
 extern crate lazy_static;
 extern crate num;
 extern crate nalgebra as na;
+extern crate rusttype;
 #[macro_use]
 extern crate scopeguard;
 extern crate time;
@@ -32,8 +33,9 @@ extern crate gfx_window_dxgi;
 extern crate gfx_device_dx11;
 
 mod load;
-mod util;
 mod platform;
+mod text;
+mod util;
 
 use ang::{Angle, Degrees};
 use gfx::{Bundle, Device, Factory, Resources};

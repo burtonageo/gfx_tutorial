@@ -19,7 +19,8 @@ fragment FragmentOut frag(VertexOutput vertices          [[stage_in]],
 	FragmentOut out;
 
 	float4 frag_col = color_texture.sample(color_texture_, vertices.uv);
-	out.main = frag_col;
+    // @FIXME: It appears that colors in Metal are bgra
+	out.main = frag_col.zyxw;
 
 	return out;
 }
