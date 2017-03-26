@@ -10,7 +10,7 @@ pub struct TextRenderer<R: Resources, T: TextureFormat, M> {
 	font_cache: GpuCache,
 	texture: Texture<R, T::Surface>,
 	srv: ShaderResourceView<R, T::View>,
-	pso: PipelineState<R, M>
+	pso: PipelineState<R, M>,
 }
 
 impl<R: Resources, T: TextureFormat, M> TextRenderer<R, T, M> {
@@ -36,7 +36,7 @@ impl<R: Resources, T: TextureFormat, M> TextRenderer<R, T, M> {
 		&self.font_cache
 	}
 
-	pub fn encode<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>) -> self::Result<()> {
+	pub fn encode<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>) -> Result<()> {
 		unimplemented!();
 	}
 }
