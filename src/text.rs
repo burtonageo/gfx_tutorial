@@ -6,7 +6,11 @@ use rusttype::gpu_cache::{Cache as GpuCache, CacheReadErr, CacheWriteErr};
 use std::error::Error as StdError;
 use std::fmt;
 
-pub struct TextRenderer<R: Resources, T: TextureFormat, M> {
+pub struct TextRenderer<R, T, M>
+	where
+		R: Resources,
+		T: TextureFormat
+{
 	font_cache: GpuCache,
 	texture: Texture<R, T::Surface>,
 	srv: ShaderResourceView<R, T::View>,
@@ -14,7 +18,13 @@ pub struct TextRenderer<R: Resources, T: TextureFormat, M> {
 }
 
 impl<R: Resources, T: TextureFormat, M> TextRenderer<R, T, M> {
-	pub fn new<F>(factory: &mut F, aa: AaMode, width: u16, height: u16, scale_tolerance: f32, position_tolerance: f32) -> Result<Self>
+	pub fn new<F>(factory: &mut F,
+				  aa: AaMode,
+				  width: u16,
+				  height: u16,
+				  scale_tolerance: f32,
+				  position_tolerance: f32)
+				  -> Result<Self>
 		where
 			F: Factory<R>
 	{
@@ -64,14 +74,13 @@ gfx_defines! {
 		pos: [f32; 3] = "v_pos",
 		tex: [f32; 2] = "v_tex",
 	}
-
-	/*
+/*
 	pipeline pipe {
 		vbuf: gfx::VertexBuffer<Vertex> = (),
 		out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
         main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
 	}
-	*/
+*/
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;
@@ -92,7 +101,20 @@ impl fmt::Display for Error {
 
 impl StdError for Error {
 	fn description(&self) -> &str {
-		"an error occurred"
+		match *self {
+			Error::Gfx(_) => "an error occurred during a gfx operation",
+			Error::GfxPso(_) => "could not create pso",
+			Error::CacheRead(_) => "an error occurred when reading from the cache",
+			Error::CacheWrite(_) => "an error occurred when writing to the cache",
+		}
+	}
+
+	fn cause(&self) -> Option<&StdError> {
+		match *self {
+			Error::Gfx(ref e) => Some(e),
+			Error::GfxPso(ref e) => Some(e),
+			_ => None,
+		}
 	}
 }
 
