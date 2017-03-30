@@ -9,6 +9,7 @@ dependencies = [
  "gfx_device_dx11 0.5.0",
  "gfx_device_gl 0.13.0",
  "gfx_device_metal 0.1.0",
+ "gfx_rusttype 0.1.0",
  "gfx_text 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gfx_window_dxgi 0.6.0",
  "gfx_window_glutin 0.14.0",
@@ -402,6 +403,14 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gl_generator 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "gfx_rusttype"
+version = "0.1.0"
+dependencies = [
+ "gfx 0.14.0",
+ "rusttype 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

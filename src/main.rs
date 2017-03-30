@@ -6,6 +6,7 @@ extern crate find_folder;
 #[macro_use]
 extern crate gfx;
 extern crate gfx_device_gl;
+extern crate gfx_rusttype;
 // extern crate gfx_text;
 extern crate gfx_window_glutin;
 extern crate glutin;
@@ -34,7 +35,6 @@ extern crate gfx_device_dx11;
 
 mod load;
 mod platform;
-mod text;
 mod util;
 
 use ang::{Angle, Degrees};
@@ -201,6 +201,15 @@ fn main() {
         main_texture: (srv, sampler),
         out: main_color,
         main_depth: main_depth,
+    };
+
+    #[allow(dead_code, unused_variables)]
+    let _text_renderer = {
+        const POS_TOLERANCE: f32 = 0.1;
+        const SCALE_TOLERANCE: f32 = 0.1;
+        let (w, h) = window.as_winit_window().get_inner_size().unwrap_or((0u32, 0u32));
+        //gfx_rusttype::TextRenderer::new(&mut factory, w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE).unwrap()
+        ()
     };
 
     // let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");

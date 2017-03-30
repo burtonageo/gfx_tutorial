@@ -1,0 +1,8 @@
+[package]
+name = "gfx_rusttype"
+version = "0.1.0"
+authors = ["georgeburton"]
+
+[dependencies]
+gfx = { version = "0.14", path = "../../vendor/gfx/src/render" }
+rusttype = "0.2"
