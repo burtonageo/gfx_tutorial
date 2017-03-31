@@ -203,13 +203,11 @@ fn main() {
         main_depth: main_depth,
     };
 
-    #[allow(dead_code, unused_variables)]
-    let _text_renderer = {
+    let text_renderer = {
         const POS_TOLERANCE: f32 = 0.1;
         const SCALE_TOLERANCE: f32 = 0.1;
         let (w, h) = window.as_winit_window().get_inner_size().unwrap_or((0u32, 0u32));
-        //gfx_rusttype::TextRenderer::new(&mut factory, w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE).unwrap()
-        ()
+        gfx_rusttype::TextRenderer::new(&mut factory, w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE).unwrap()
     };
 
     // let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
@@ -365,6 +363,8 @@ fn main() {
         encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
+        // This is broken for now:
+        // text_renderer.encode(&mut encoder);
 
         if show_fps {
             use std::fmt::Write;

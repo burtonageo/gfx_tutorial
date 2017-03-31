@@ -34,8 +34,11 @@ impl<R: Resources> TextRenderer<R, gfx::format::Rgba8> {
 
         const INDICES: &[u16] = &[0u16, 1, 2, 3, 0, 1];
 
+        const VERT_SRC: &[u8] = include_bytes!("../data/glsl/text.vs");
+        const FRAG_SRC: &[u8] = include_bytes!("../data/glsl/text.fs");
+
         let (t, srv, rtv) = factory.create_render_target(width, height)?;
-        let pso = factory.create_pipeline_simple(&[], &[], pipe::new())?;
+        let pso = factory.create_pipeline_simple(VERT_SRC, FRAG_SRC, pipe::new())?;
         let (vbuf, slice) = factory.create_vertex_buffer_with_slice(PLANE, INDICES);
 
         let data = pipe::Data {
@@ -44,14 +47,12 @@ impl<R: Resources> TextRenderer<R, gfx::format::Rgba8> {
             out: rtv,
         };
 
-        let renderer: TextResult<TextRenderer<R, _>> = Ok(TextRenderer {
+        Ok(TextRenderer {
             font_cache: GpuCache::new(width as u32, height as u32, scale_tolerance, position_tolerance),
             texture: t,
             srv: srv,
             bundle: Bundle::new(slice, pso, data),
-        });
-
-        renderer
+        })
     }
 }
 
@@ -84,8 +85,8 @@ impl<R, T> fmt::Debug for TextRenderer<R, T>
 
 gfx_defines! {
     vertex Vertex {
-        pos: [f32; 3] = "v_pos",
-        tex: [f32; 2] = "v_tex",
+        pos: [f32; 3] = "v_Pos",
+        tex: [f32; 2] = "v_Tex",
     }
 
     constant Locals {
