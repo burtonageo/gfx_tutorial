@@ -17,7 +17,6 @@ find_folder = "0.*"
 gfx = { version = "0.14", path = "./vendor/gfx/src/render" }
 gfx_device_gl = { version = "0.13", path = "./vendor/gfx/src/backend/gl" }
 gfx_rusttype = { version = "0.1", path = "./src/gfx_rusttype"}
-gfx_text = "0.15"
 gfx_window_glutin = { version = "0.14", path = "./vendor/gfx/src/window/glutin" }
 glutin = "0.7"
 image = "0.12"

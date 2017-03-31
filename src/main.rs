@@ -7,7 +7,6 @@ extern crate find_folder;
 extern crate gfx;
 extern crate gfx_device_gl;
 extern crate gfx_rusttype;
-// extern crate gfx_text;
 extern crate gfx_window_glutin;
 extern crate glutin;
 extern crate image;
@@ -363,14 +362,11 @@ fn main() {
         encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
-        // This is broken for now:
-        // text_renderer.encode(&mut encoder);
 
         if show_fps {
             use std::fmt::Write;
             fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
-            //text.add(&fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
-            //text.draw(&mut encoder, &bundle.data.out).unwrap();
+            text_renderer.encode(&mut encoder);
             println!("{}", fps_string);
             fps_string.clear();
         }
