@@ -41,6 +41,7 @@ use gfx::{Bundle, Device, Factory, Resources};
 use gfx::format::Rgba8;
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
+use gfx_rusttype::{Color, TextRenderer, StyledText};
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
@@ -158,7 +159,7 @@ fn main() {
         .with_decorations(false);
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_native::<Rgba8, gfx::format::Depth32F>(builder)
+        platform::launch_gl::<Rgba8, gfx::format::Depth32F>(builder)
             .expect("Could not create window or graphics device");
 
     window.hide_and_grab_cursor().expect("Could not set cursor state");
@@ -202,14 +203,14 @@ fn main() {
         main_depth: main_depth,
     };
 
-    let text_renderer = {
+    let mut text_renderer = {
         const POS_TOLERANCE: f32 = 0.1;
         const SCALE_TOLERANCE: f32 = 0.1;
         let (w, h) = window.as_winit_window().get_inner_size().unwrap_or((0u32, 0u32));
-        gfx_rusttype::TextRenderer::new(&mut factory, w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE).unwrap()
+        TextRenderer::new(&mut factory, data.out.clone(), w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE)
+            .expect("Could not create text renderer")
     };
 
-    // let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
     let mut bundle = Bundle::new(slice, pso, data);
 
     let mut rot = Rotation3::identity();
@@ -366,6 +367,14 @@ fn main() {
         if show_fps {
             use std::fmt::Write;
             fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
+            {
+                let text = StyledText {
+                    string: &fps_string,
+                    color: Color { r: 0.5, g: 0.0, b: 1.0, a: 0.5 },
+                    .. Default::default()
+                };
+                text_renderer.add_text(&text);
+            }
             text_renderer.encode(&mut encoder);
             println!("{}", fps_string);
             fps_string.clear();
