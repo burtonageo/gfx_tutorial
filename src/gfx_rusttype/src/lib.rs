@@ -81,6 +81,7 @@ impl<R: Resources> fmt::Debug for TextRenderer<R> {
             //.field("texture", &self.texture)
             //.field("srv", &self.srv)
             //.field("bundle", &self.bundle)
+            .field("current_color", &self.current_color)
             .finish()
     }
 }
