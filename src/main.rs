@@ -46,11 +46,13 @@ use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
 use platform::{FactoryExt as PlFactoryExt, Window, WinitWindowExt as PlatformWindow};
+use rusttype::FontCollection;
 use std::env::args;
 use std::ops::Neg;
+use std::path::Path;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
-use util::get_assets_folder;
+use util::{get_assets_folder, open_file_relative_to_assets};
 
 gfx_defines! {
     vertex Vertex {
@@ -203,11 +205,31 @@ fn main() {
         main_depth: main_depth,
     };
 
+    fn read_fonts(main_font: &Path, font_paths: &[&Path]) -> Result<FontCollection<'static>, ()> {
+        use std::io::Read;
+        let open_font_asset = |&p| {
+            Box::new(open_file_relative_to_assets(p).unwrap()) as Box<Read>
+        };
+
+        let mut all_fonts = font_paths
+            .iter()
+            .map(&open_font_asset)
+            .fold(open_font_asset(&main_font), |f0, f1| Box::new(f0.chain(f1)));
+
+        let mut bytes = vec![];
+        all_fonts.read_to_end(&mut bytes).unwrap();
+        Ok(FontCollection::from_bytes(bytes))
+    }
+
     let mut text_renderer = {
         const POS_TOLERANCE: f32 = 0.1;
         const SCALE_TOLERANCE: f32 = 0.1;
         let (w, h) = window.as_winit_window().get_inner_size().unwrap_or((0u32, 0u32));
-        TextRenderer::new(&mut factory, data.out.clone(), w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE)
+        TextRenderer::new(&mut factory, data.out.clone(), w as u16, h as u16, POS_TOLERANCE, SCALE_TOLERANCE,
+                          read_fonts("fonts/noto_sans/NotoSans-Regular.ttf".as_ref(),
+                                     &["fonts/noto_sans/NotoSans-Bold.ttf".as_ref(),
+                                       "fonts/noto_sans/NotoSans-Italic.ttf".as_ref(),
+                                       "fonts/noto_sans/NotoSans-BoldItalic.ttf".as_ref()]).unwrap())
             .expect("Could not create text renderer")
     };
 

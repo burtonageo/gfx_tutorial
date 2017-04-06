@@ -6,6 +6,7 @@ use gfx::{CombinedError, CommandBuffer, Encoder, PipelineStateError, Resources};
 use gfx::handle::{Texture, RenderTargetView, ShaderResourceView};
 use gfx::pso::bundle::Bundle;
 use gfx::traits::FactoryExt;
+use rusttype::FontCollection;
 use rusttype::gpu_cache::{Cache as GpuCache, CacheReadErr, CacheWriteErr};
 use std::error::Error as StdError;
 use std::fmt;
@@ -16,6 +17,7 @@ pub struct TextRenderer<R: Resources> {
     // srv: ShaderResourceView<R, T::View>,
     bundle: Bundle<R, pipe::Data<R>>,
     current_color: [f32; 4],
+    font_collection: FontCollection<'static>,
 }
 
 impl<R: Resources> TextRenderer<R> {
@@ -24,7 +26,8 @@ impl<R: Resources> TextRenderer<R> {
                                  width: u16,
                                  height: u16,
                                  scale_tolerance: f32,
-                                 position_tolerance: f32)
+                                 position_tolerance: f32,
+                                 font_collection: FontCollection<'static>)
                                  -> TextResult<Self> {
     	const PLANE: &[Vertex] = &[
             Vertex { pos: [ -1.0, -1.0, 0.0 ], tex: [0.0, 0.0] },
@@ -54,6 +57,7 @@ impl<R: Resources> TextRenderer<R> {
             // srv: srv,
             bundle: Bundle::new(slice, pso, data),
             current_color: Default::default(),
+            font_collection: font_collection,
         })
     }
 
