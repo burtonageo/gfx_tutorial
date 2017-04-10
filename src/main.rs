@@ -46,7 +46,7 @@ use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::Zero;
 use platform::{FactoryExt as PlFactoryExt, Window, WinitWindowExt as PlatformWindow};
-use rusttype::FontCollection;
+use rusttype::{FontCollection, point, Scale};
 use std::env::args;
 use std::ops::Neg;
 use std::path::Path;
@@ -390,12 +390,8 @@ fn main() {
             use std::fmt::Write;
             fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
             {
-                let text = StyledText {
-                    string: &fps_string,
-                    color: Color { r: 0.5, g: 0.0, b: 1.0, a: 0.5 },
-                    .. Default::default()
-                };
-                text_renderer.add_text(&text);
+                let text = StyledText::new(&fps_string, Color::new(0.5, 0.0, 1.0, 0.5), Scale::uniform(10.0), point(0.0, 0.0));
+                text_renderer.add_text(&text, &mut encoder).expect("Could not add text");
             }
             text_renderer.encode(&mut encoder);
             println!("{}", fps_string);
