@@ -394,7 +394,6 @@ fn main() {
                 text_renderer.add_text(&text, &mut encoder).expect("Could not add text");
             }
             text_renderer.encode(&mut encoder);
-            println!("{}", fps_string);
             fps_string.clear();
         }
 
