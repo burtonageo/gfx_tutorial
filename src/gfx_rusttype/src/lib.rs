@@ -5,7 +5,7 @@ extern crate rusttype;
 use gfx::{CombinedError, CommandBuffer, Encoder, PipelineStateError, Resources, ResourceViewError,
           SHADER_RESOURCE, TRANSFER_DST, UpdateError};
 use gfx::format::{ChannelType, Formatted, Rgba8, Swizzle};
-use gfx::handle::{Texture, RenderTargetView, ShaderResourceView};
+use gfx::handle::{Texture, RenderTargetView};
 use gfx::memory::Usage;
 use gfx::pso::bundle::Bundle;
 use gfx::texture::{AaMode, CreationError, NewImageInfo, Kind};
@@ -13,12 +13,11 @@ use gfx::traits::FactoryExt;
 use rusttype::{FontCollection, Point, Scale};
 use rusttype::gpu_cache::{Cache as GpuCache, CacheReadErr, CacheWriteErr};
 use std::error::Error as StdError;
-use std::{fmt, mem};
+use std::fmt;
 
 pub struct TextRenderer<R: Resources> {
     font_cache: GpuCache,
     texture: Texture<R, <Rgba8 as Formatted>::Surface>,
-    srv: ShaderResourceView<R, <Rgba8 as Formatted>::View>,
     bundle: Bundle<R, pipe::Data<R>>,
     current_color: [f32; 4],
     font_collection: FontCollection<'static>,
@@ -52,19 +51,20 @@ impl<R: Resources> TextRenderer<R> {
                                        Usage::Dynamic,
                                        Some(ChannelType::Unorm))?;
         let srv = factory.view_texture_as_shader_resource::<Rgba8>(&t, (1, 1), Swizzle::new())?;
+        let sampler = factory.create_sampler_linear();
         let pso = factory.create_pipeline_simple(VERT_SRC, FRAG_SRC, pipe::new())?;
         let (vbuf, slice) = factory.create_vertex_buffer_with_slice(PLANE, INDICES);
 
         let data = pipe::Data {
             vbuf: vbuf,
             locals: factory.create_constant_buffer(1),
+            text_sampler: (srv, sampler),
             out: render_target,
         };
 
         Ok(TextRenderer {
             font_cache: GpuCache::new(width as u32, height as u32, scale_tolerance, position_tolerance),
             texture: t,
-            srv: srv,
             bundle: Bundle::new(slice, pso, data),
             current_color: Default::default(),
             font_collection: font_collection,
@@ -87,6 +87,7 @@ impl<R: Resources> TextRenderer<R> {
         let texture = &self.texture;
 
         self.font_cache.cache_queued(|rect, pix_data| {
+            let data = pix_data.iter().map(|&byte| [255, 0, 0, byte]).collect::<Vec<_>>();
             let Point {x, y} = rect.min;
             let (w, h) = (rect.width() as u16, rect.height() as u16);
             let img_info = NewImageInfo {
@@ -102,9 +103,7 @@ impl<R: Resources> TextRenderer<R> {
             texture_update_error = texture_update_encoder.update_texture::<_, Rgba8>(texture,
                                                                                      None,
                                                                                      img_info,
-                                                                                     unsafe {
-                                                                                         mem::transmute(pix_data)
-                                                                                     }).err();
+                                                                                     &data[..]).err();
         })?;
 
         if let Some(res) = texture_update_error { Err(From::from(res)) } else { Ok(()) }
@@ -127,7 +126,6 @@ impl<R: Resources> fmt::Debug for TextRenderer<R> {
         fmtr.debug_struct("TextRenderer")
             .field("font_cache", &"rusttype::gpu_cache::Cache { .. }")
             .field("texture", &self.texture)
-            .field("srv", &self.srv)
             .field("bundle", &"gfx::pso::bundle::Bundle { .. }")
             .field("current_color", &self.current_color)
             .finish()
@@ -146,6 +144,7 @@ gfx_defines! {
 
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
+        text_sampler: gfx::TextureSampler<[f32; 4]> = "f_TextSampler",
         locals: gfx::ConstantBuffer<Locals> = "f_TextLocals",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
     }
