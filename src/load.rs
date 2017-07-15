@@ -124,7 +124,7 @@ impl Error for LoadObjError {
         match *self {
             LoadObjError::Io(ref e) => Some(e),
             LoadObjError::AssetsFolder(ref e) => Some(e),
-            _ => None, 
+            _ => None,
         }
     }
 }
