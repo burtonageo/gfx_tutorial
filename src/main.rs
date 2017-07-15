@@ -178,7 +178,7 @@ fn main() {
 
     let sampler = factory.create_sampler_linear();
 
-    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
+    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into())).expect("Could not load obj file");
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let data = pipe::Data {
         vbuf: vertex_buffer,
@@ -245,7 +245,7 @@ fn main() {
                 Event::Closed |
                 Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
                 #[cfg(not(target_os = "macos"))]
-                Event::Resized(w, h) => {
+                Event::Resized(_w, _h) => {
                     window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
                     projection.set_aspect(window.aspect());
                 }
@@ -332,7 +332,7 @@ fn main() {
 
         bundle.encode(&mut encoder);
 
-        fps.render(&mut encoder, &bundle.data.out);
+        fps.render(dt_s, &mut encoder, &bundle.data.out);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
@@ -343,7 +343,7 @@ fn main() {
 struct FpsRenderer<R: Resources, F: Factory<R>> {
     pub show_fps: bool,
     fps_string: String, // enough space to display "fps: xxx.yy"
-    renderer: gfx_text::Renderer<R, F>,
+    text_renderer: gfx_text::Renderer<R, F>,
 }
 
 #[cfg(not(windows))]
@@ -352,24 +352,25 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
         FpsRenderer {
             show_fps: false,
             fps_string: String::with_capacity(12),
-            renderer: gfx_text::new(factory).build()?,
+            text_renderer: gfx_text::new(factory).build()?,
         }
     }
 
     fn render<C, T>(
         &mut self,
+        dt_s: f32,
         encoder: &mut Encoder<R, C>,
         target: &RenderTargetView<R, T>)
     where
         C: CommandBuffer<R>,
         T: RenderFormat,
     {
-        if show_fps {
+        if self.show_fps {
             use std::fmt::Write;
             self.fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
-            text.add(&self.fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
-            text.draw(encoder, target).unwrap();
-            fps_string.clear();
+            self.text_renderer.add(&self.fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            self.text_renderer.draw(encoder, target).unwrap();
+            self.fps_string.clear();
         }
     }
 }
@@ -382,7 +383,7 @@ struct FpsRenderer<R: Resources, F: Factory<R>> {
 
 #[cfg(windows)]
 impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
-    fn new(factory: F) -> Result<Self, ()> {
+    fn new(_factory: F) -> Result<Self, ()> {
         Ok(FpsRenderer {
             show_fps: false,
             _marker: ::std::marker::PhantomData,
@@ -391,6 +392,7 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
 
     fn render<C, T>(
         &mut self,
+        _dt_s: f32,
         _encoder: &mut Encoder<R, C>,
         _target: &RenderTargetView<R, T>)
     where
