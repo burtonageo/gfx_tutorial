@@ -5,10 +5,9 @@ use std::fmt;
 use std::fs::File;
 use std::io::{self, Read};
 use std::cmp::{Eq, Ord, Ordering};
+use util::{GetAssetsFolderError, get_assets_folder};
 use wavefront_obj::{ParseError, obj};
 use Vertex;
-
-use util::{GetAssetsFolderError, get_assets_folder};
 
 pub type Index = u16;
 
