@@ -6,6 +6,7 @@ extern crate find_folder;
 #[macro_use]
 extern crate gfx;
 extern crate gfx_device_gl;
+#[cfg(not(windows))]
 extern crate gfx_text;
 extern crate gfx_window_glutin;
 extern crate glutin;
@@ -33,8 +34,9 @@ mod util;
 mod platform;
 
 use angular::{Angle, Degrees};
-use gfx::{Bundle, Device, Factory, Resources};
-use gfx::format::{Depth, Rgba8};
+use gfx::{Bundle, CommandBuffer, Device, Encoder, Factory, Resources};
+use gfx::format::{Depth, RenderFormat, Rgba8};
+use gfx::handle::RenderTargetView;
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use load::load_obj;
@@ -189,7 +191,7 @@ fn main() {
         main_depth: main_depth,
     };
 
-    let mut text = gfx_text::new(factory).build().expect("Could not create text renderer");
+    let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
     let mut bundle = Bundle::new(slice, pso, data);
 
     let mut rot = Rotation3::identity();
@@ -197,9 +199,6 @@ fn main() {
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
-
-    let mut show_fps = false;
-    let mut fps_string = String::with_capacity(12); // enough space to display "fps: xxx.yy"
 
     'main: loop {
         let current = PreciseTime::now();
@@ -274,7 +273,7 @@ fn main() {
                     iput.position -= right * SPEED * dt_s;
                 }
                 Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::Space)) => {
-                    show_fps = !show_fps;
+                    fps.show_fps = !fps.show_fps;
                 }
                 Event::Focused(gained) => {
                     is_paused = !gained;
@@ -333,17 +332,71 @@ fn main() {
 
         bundle.encode(&mut encoder);
 
-        if show_fps {
-            use std::fmt::Write;
-            fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
-            text.add(&fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
-            text.draw(&mut encoder, &bundle.data.out).unwrap();
-            fps_string.clear();
-        }
-
+        fps.render(&mut encoder, &bundle.data.out);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
+    }
+}
+
+#[cfg(not(windows))]
+struct FpsRenderer<R: Resources, F: Factory<R>> {
+    pub show_fps: bool,
+    fps_string: String, // enough space to display "fps: xxx.yy"
+    renderer: gfx_text::Renderer<R, F>,
+}
+
+#[cfg(not(windows))]
+impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
+    fn new(factory: F) -> Result<Self, gfx_text::Error> {
+        FpsRenderer {
+            show_fps: false,
+            fps_string: String::with_capacity(12),
+            renderer: gfx_text::new(factory).build()?,
+        }
+    }
+
+    fn render<C, T>(
+        &mut self,
+        encoder: &mut Encoder<R, C>,
+        target: &RenderTargetView<R, T>)
+    where
+        C: CommandBuffer<R>,
+        T: RenderFormat,
+    {
+        if show_fps {
+            use std::fmt::Write;
+            self.fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
+            text.add(&self.fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            text.draw(encoder, target).unwrap();
+            fps_string.clear();
+        }
+    }
+}
+
+#[cfg(windows)]
+struct FpsRenderer<R: Resources, F: Factory<R>> {
+    pub show_fps: bool,
+    _marker: ::std::marker::PhantomData<(R, F)>,
+}
+
+#[cfg(windows)]
+impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
+    fn new(factory: F) -> Result<Self, ()> {
+        Ok(FpsRenderer {
+            show_fps: false,
+            _marker: ::std::marker::PhantomData,
+        })
+    }
+
+    fn render<C, T>(
+        &mut self,
+        _encoder: &mut Encoder<R, C>,
+        _target: &RenderTargetView<R, T>)
+    where
+        C: CommandBuffer<R>,
+        T: RenderFormat,
+    {
     }
 }
 
