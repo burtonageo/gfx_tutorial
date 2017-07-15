@@ -26,9 +26,11 @@ pub fn load_obj(obj_name: &str)
 {
     use wavefront_obj::obj::Primitive;
     let mut obj_string = String::new();
-    let mut obj_file_name = get_assets_folder().map(|p| p.to_path_buf())?;
-    obj_file_name.push(&format!("mesh/{}.obj", obj_name));
-    File::open(obj_file_name).and_then(|mut f| f.read_to_string(&mut obj_string))?;
+    {
+        let mut obj_file_name = get_assets_folder().map(|p| p.to_path_buf())?;
+        obj_file_name.push(&format!("mesh/{}.obj", obj_name));
+        File::open(obj_file_name).and_then(|mut f| f.read_to_string(&mut obj_string))?;
+    }
 
     let obj = obj::parse(obj_string)?;
     let object = match obj.objects.get(0) {
