@@ -1,4 +1,4 @@
-#![feature(conservative_impl_trait)]
+#![feature(conservative_impl_trait, never_type)]
 
 extern crate alga;
 extern crate angular;
@@ -342,16 +342,17 @@ fn main() {
 #[cfg(not(windows))]
 struct FpsRenderer<R: Resources, F: Factory<R>> {
     pub show_fps: bool,
-    fps_string: String, // enough space to display "fps: xxx.yy"
+    fps_string: String,
     text_renderer: gfx_text::Renderer<R, F>,
 }
 
 #[cfg(not(windows))]
 impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
+    #[inline]
     fn new(factory: F) -> Result<Self, gfx_text::Error> {
         FpsRenderer {
             show_fps: false,
-            fps_string: String::with_capacity(12),
+            fps_string: String::with_capacity(12), // enough space to display "fps: xxx.yy"
             text_renderer: gfx_text::new(factory).build()?,
         }
     }
@@ -383,13 +384,15 @@ struct FpsRenderer<R: Resources, F: Factory<R>> {
 
 #[cfg(windows)]
 impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
-    fn new(_factory: F) -> Result<Self, ()> {
+    #[inline]
+    fn new(_factory: F) -> Result<Self, !> {
         Ok(FpsRenderer {
             show_fps: false,
             _marker: ::std::marker::PhantomData,
         })
     }
 
+    #[inline]
     fn render<C, T>(
         &mut self,
         _dt_s: f32,
