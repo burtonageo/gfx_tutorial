@@ -151,6 +151,7 @@ impl Ord for PackedObjVertex {
 }
 
 impl PackedObjVertex {
+    #[inline]
     fn new(p: obj::Vertex, t: obj::TVertex, n: obj::Normal) -> Self {
         PackedObjVertex {
             pos: p,
@@ -176,7 +177,7 @@ fn build_unified_buffers(vertices: &[obj::Vertex],
             Entry::Occupied(e) => out_inds.push(*e.get()),
             Entry::Vacant(e) => {
                 out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
-                let new_index = (out_verts.len() - 1) as u16;
+                let new_index = (out_verts.len() - 1) as Index;
                 out_inds.push(new_index);
                 e.insert(new_index);
             }
