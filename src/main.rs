@@ -100,6 +100,7 @@ struct Input {
 }
 
 impl Input {
+    #[inline]
     fn new() -> Self {
         Input {
             position: Point3::new(0.0, 0.0, 10.0),
@@ -112,7 +113,6 @@ impl Input {
 
 const SPEED: f32 = 4.0;
 const MOUSE_SPEED: f32 = 7.0;
-const DEFAULT_WIN_SIZE: (i32, i32) = (1024, 768);
 
 #[derive(Clone, Debug, PartialEq)]
 struct Light {
@@ -122,6 +122,7 @@ struct Light {
 }
 
 impl Default for Light {
+    #[inline]
     fn default() -> Self {
         Light {
             position: na::origin(),
@@ -132,6 +133,7 @@ impl Default for Light {
 }
 
 impl From<Light> for ShaderLight {
+    #[inline]
     fn from(l: Light) -> Self {
         let na::coordinates::XYZ { x, y, z } = *l.position;
         ShaderLight {
@@ -145,10 +147,10 @@ impl From<Light> for ShaderLight {
 const MAX_LIGHTS: usize = 10;
 
 fn main() {
+    let (win_w, win_h) = winit::get_primary_monitor().get_dimensions();
     let builder = winit::WindowBuilder::new()
-        .with_title("Gfx Example")
-        .with_dimensions(DEFAULT_WIN_SIZE.0 as u32, DEFAULT_WIN_SIZE.1 as u32)
-        .with_decorations(false);
+        .with_dimensions(win_w, win_h)
+        .with_title("Gfx Example");
 
     let (_backend, window, mut device, mut factory, main_color, main_depth) =
         platform::launch_gl::<Rgba8, Depth>(builder)
@@ -427,7 +429,8 @@ impl<R: Resources, W: PlatformWindow<R>> WindowExt<R> for W {
 
         self.as_winit_window()
             .get_inner_size()
+            .or(Some(winit::get_primary_monitor().get_dimensions()))
             .map(u32pair_toi32pair)
-            .unwrap_or(DEFAULT_WIN_SIZE)
+            .unwrap()
     }
 }
