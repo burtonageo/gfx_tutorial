@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["georgeburton"]
 
 [profile.dev]
+opt-level = 1
 panic = "abort"
 
 [profile.release]
