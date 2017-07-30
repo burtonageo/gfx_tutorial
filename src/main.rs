@@ -1,3 +1,5 @@
+#![feature(conservative_impl_trait, never_type)]
+
 extern crate alga;
 extern crate ang;
 extern crate find_folder;
@@ -41,6 +43,8 @@ mod util;
 use ang::{Angle, Degrees};
 use gfx::{Bundle, Device, Factory, Resources};
 use gfx::format::Rgba8;
+use gfx::format::{Depth, RenderFormat, Rgba8};
+use gfx::handle::RenderTargetView;
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use gfx_rusttype::{Color, TextRenderer, StyledText};
@@ -112,6 +116,7 @@ struct Input {
 }
 
 impl Input {
+    #[inline]
     fn new() -> Self {
         Input {
             position: Point3::new(0.0, 0.0, 10.0),
@@ -124,7 +129,6 @@ impl Input {
 
 const SPEED: f32 = 4.0;
 const MOUSE_SPEED: f32 = 7.0;
-const DEFAULT_WIN_SIZE: (i32, i32) = (1024, 768);
 
 #[derive(Clone, Debug, PartialEq)]
 struct Light {
@@ -134,6 +138,7 @@ struct Light {
 }
 
 impl Default for Light {
+    #[inline]
     fn default() -> Self {
         Light {
             position: na::origin(),
@@ -144,6 +149,7 @@ impl Default for Light {
 }
 
 impl From<Light> for ShaderLight {
+    #[inline]
     fn from(l: Light) -> Self {
         let na::coordinates::XYZ { x, y, z } = *l.position;
         ShaderLight {
@@ -158,10 +164,10 @@ const MAX_LIGHTS: usize = 10;
 
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
+    let (win_w, win_h) = winit::get_primary_monitor().get_dimensions();
     let builder = winit::WindowBuilder::new()
-        .with_title("Gfx Example")
-        .with_dimensions(DEFAULT_WIN_SIZE.0 as u32, DEFAULT_WIN_SIZE.1 as u32)
-        .with_decorations(false);
+        .with_dimensions(win_w, win_h)
+        .with_title("Gfx Example");
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
         platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(builder, &events_loop)
@@ -195,7 +201,7 @@ fn main() {
 
     let sampler = factory.create_sampler_linear();
 
-    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into()));
+    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into())).expect("Could not load obj file");
     let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
     let data = pipe::Data {
         vbuf: vertex_buffer,
@@ -208,34 +214,7 @@ fn main() {
         main_depth: main_depth,
     };
 
-    fn read_fonts(main_font: &Path, font_paths: &[&Path]) -> Result<FontCollection<'static>, ()> {
-        use std::io::Read;
-        let open_font_asset = |&p| {
-            Box::new(open_file_relative_to_assets(p).unwrap()) as Box<Read>
-        };
-
-        let mut all_fonts = font_paths
-            .iter()
-            .map(&open_font_asset)
-            .fold(open_font_asset(&main_font), |f0, f1| Box::new(f0.chain(f1)));
-
-        let mut bytes = vec![];
-        all_fonts.read_to_end(&mut bytes).unwrap();
-        Ok(FontCollection::from_bytes(bytes))
-    }
-
-    let mut text_renderer = {
-        const POS_TOLERANCE: f32 = 0.1;
-        const SCALE_TOLERANCE: f32 = 0.1;
-        let (w, h) = window.windowext_get_inner_size::<u16>();
-        TextRenderer::new(&mut factory, data.out.clone(), w, h, POS_TOLERANCE, SCALE_TOLERANCE,
-                          read_fonts("fonts/noto_sans/NotoSans-Regular.ttf".as_ref(),
-                                     &["fonts/noto_sans/NotoSans-Bold.ttf".as_ref(),
-                                       "fonts/noto_sans/NotoSans-Italic.ttf".as_ref(),
-                                       "fonts/noto_sans/NotoSans-BoldItalic.ttf".as_ref()]).unwrap())
-            .expect("Could not create text renderer")
-    };
-
+    let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
     let mut bundle = Bundle::new(slice, pso, data);
 
     let mut rot = Rotation3::identity();
@@ -400,18 +379,7 @@ fn main() {
         encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
-
-        if show_fps {
-            use std::fmt::Write;
-            fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
-            {
-                let text = StyledText::new(&fps_string, Color::new(0.5, 0.0, 1.0, 0.5), Scale::uniform(10.0), point(0.0, 0.0));
-                text_renderer.add_text(&text, &mut encoder).expect("Could not add text");
-            }
-            text_renderer.encode(&mut encoder);
-            fps_string.clear();
-        }
-
+        fps.render(dt_s, &mut encoder, &bundle.data.out);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
@@ -419,7 +387,7 @@ fn main() {
 }
 
 trait WindowExt {
-    fn center_cursor(&self) -> Result<(), ()>;
+   fn center_cursor(&self) -> Result<(), ()>;
     fn hide_and_grab_cursor(&self) -> Result<(), String>;
     fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N);
     fn aspect<N: Default + Div<Output=N> + NumCast + Zero + One>(&self) -> N {
@@ -447,5 +415,71 @@ impl WindowExt for winit::Window {
         self.get_inner_size_pixels()
             .map(cast_pair)
             .unwrap_or(Default::default())
+    }
+}
+
+#[cfg(not(windows))]
+struct FpsRenderer<R: Resources, F: Factory<R>> {
+    pub show_fps: bool,
+    fps_string: String,
+    text_renderer: gfx_text::Renderer<R, F>,
+}
+
+#[cfg(not(windows))]
+impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
+    #[inline]
+    fn new(factory: F) -> Result<Self, gfx_text::Error> {
+        FpsRenderer {
+            show_fps: false,
+            fps_string: String::with_capacity(12), // enough space to display "fps: xxx.yy"
+            text_renderer: gfx_text::new(factory).build()?,
+        }
+    }
+
+    fn render<C, T>(
+        &mut self,
+        dt_s: f32,
+        encoder: &mut Encoder<R, C>,
+        target: &RenderTargetView<R, T>)
+    where
+        C: CommandBuffer<R>,
+        T: RenderFormat,
+    {
+        if self.show_fps {
+            use std::fmt::Write;
+            self.fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
+            self.text_renderer.add(&self.fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            self.text_renderer.draw(encoder, target).unwrap();
+            self.fps_string.clear();
+        }
+    }
+}
+
+#[cfg(windows)]
+struct FpsRenderer<R: Resources, F: Factory<R>> {
+    pub show_fps: bool,
+    _marker: ::std::marker::PhantomData<(R, F)>,
+}
+
+#[cfg(windows)]
+impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
+    #[inline]
+    fn new(_factory: F) -> Result<Self, !> {
+        Ok(FpsRenderer {
+            show_fps: false,
+            _marker: ::std::marker::PhantomData,
+        })
+    }
+
+    #[inline]
+    fn render<C, T>(
+        &mut self,
+        _dt_s: f32,
+        _encoder: &mut Encoder<R, C>,
+        _target: &RenderTargetView<R, T>)
+    where
+        C: CommandBuffer<R>,
+        T: RenderFormat,
+    {
     }
 }

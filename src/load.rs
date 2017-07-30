@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::error::Error;
+use std::fmt;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::cmp::{Eq, Ord, Ordering};
-use wavefront_obj::obj;
+use util::{GetAssetsFolderError, get_assets_folder};
+use wavefront_obj::{ParseError, obj};
 use Vertex;
 
-use util::get_assets_folder;
+pub type Index = u16;
 
 impl Vertex {
     fn new(v: &obj::Vertex, tex_coord: &obj::TVertex, normal: &obj::Normal) -> Self {
@@ -18,17 +21,22 @@ impl Vertex {
     }
 }
 
-pub fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
+pub fn load_obj(obj_name: &str)
+    -> Result<(Vec<Vertex>, Vec<Index>), LoadObjError>
+{
     use wavefront_obj::obj::Primitive;
     let mut obj_string = String::new();
-    let mut obj_file_name = get_assets_folder().unwrap().to_path_buf();
-    obj_file_name.push(&format!("mesh/{}.obj", obj_name));
-    let mut obj_file = File::open(obj_file_name).expect(&format!("Could not open {}.obj", obj_name));
-    obj_file.read_to_string(&mut obj_string).expect(&format!("Could not read {}.obj", obj_name));
-    drop(obj_file);
+    {
+        let mut obj_file_name = get_assets_folder().map(|p| p.to_path_buf())?;
+        obj_file_name.push(&format!("mesh/{}.obj", obj_name));
+        File::open(obj_file_name).and_then(|mut f| f.read_to_string(&mut obj_string))?;
+    }
 
-    let obj = obj::parse(obj_string).expect(&format!("Could not parse {}.obj", obj_name));
-    let object = obj.objects.get(0).expect("No objects");
+    let obj = obj::parse(obj_string)?;
+    let object = match obj.objects.get(0) {
+        Some(o) => o,
+        None => return Err(LoadObjError::NoMeshFound),
+    };
 
     let mut verts = Vec::new();
     let mut uvs = Vec::new();
@@ -55,7 +63,70 @@ pub fn load_obj(obj_name: &str) -> (Vec<Vertex>, Vec<u16>) {
         }
     }
 
-    build_unified_buffers(&verts[..], &uvs[..], &norms[..])
+    Ok(build_unified_buffers(&verts[..], &uvs[..], &norms[..]))
+}
+
+#[derive(Debug)]
+pub enum LoadObjError {
+    Io(io::Error),
+    ObjParse(ParseError),
+    AssetsFolder(GetAssetsFolderError),
+    NoMeshFound,
+}
+
+impl From<io::Error> for LoadObjError {
+    #[inline]
+    fn from(e: io::Error) -> Self {
+        LoadObjError::Io(e)
+    }
+}
+
+impl From<ParseError> for LoadObjError {
+    #[inline]
+    fn from(e: ParseError) -> Self {
+        LoadObjError::ObjParse(e)
+    }
+}
+
+impl From<GetAssetsFolderError> for LoadObjError {
+    #[inline]
+    fn from(e: GetAssetsFolderError) -> Self {
+        LoadObjError::AssetsFolder(e)
+    }
+}
+
+impl fmt::Display for LoadObjError {
+    #[inline]
+    fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LoadObjError::Io(ref e) => write!(fmtr, "{}: {}", self.description(), e),
+            LoadObjError::ObjParse(ref e) => write!(fmtr, "{}, {:?}", self.description(), e),
+            LoadObjError::AssetsFolder(ref e) =>
+                write!(fmtr, "{}, {:?}", self.description(), e),
+            LoadObjError::NoMeshFound => fmtr.pad(self.description()),
+        }
+    }
+}
+
+impl Error for LoadObjError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            LoadObjError::Io(_) => "An I/O error occurred",
+            LoadObjError::ObjParse(_) => "Could not parse Obj file",
+            LoadObjError::AssetsFolder(_) => "Could not get assets folder",
+            LoadObjError::NoMeshFound => "Could not find a mesh in the obj file",
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&Error> {
+        match *self {
+            LoadObjError::Io(ref e) => Some(e),
+            LoadObjError::AssetsFolder(ref e) => Some(e),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -80,6 +151,7 @@ impl Ord for PackedObjVertex {
 }
 
 impl PackedObjVertex {
+    #[inline]
     fn new(p: obj::Vertex, t: obj::TVertex, n: obj::Normal) -> Self {
         PackedObjVertex {
             pos: p,
@@ -92,7 +164,7 @@ impl PackedObjVertex {
 fn build_unified_buffers(vertices: &[obj::Vertex],
                          tex_coords: &[obj::TVertex],
                          normals: &[obj::Normal])
-                         -> (Vec<Vertex>, Vec<u16>) {
+                         -> (Vec<Vertex>, Vec<Index>) {
     let mut out_verts = Vec::new();
     let mut out_inds = Vec::new();
     let mut vert_to_out = BTreeMap::new();
@@ -105,7 +177,7 @@ fn build_unified_buffers(vertices: &[obj::Vertex],
             Entry::Occupied(e) => out_inds.push(*e.get()),
             Entry::Vacant(e) => {
                 out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
-                let new_index = (out_verts.len() - 1) as u16;
+                let new_index = (out_verts.len() - 1) as Index;
                 out_inds.push(new_index);
                 e.insert(new_index);
             }

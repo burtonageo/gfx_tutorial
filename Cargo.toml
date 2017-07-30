@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["georgeburton"]
 
 [profile.dev]
+opt-level = 1
 panic = "abort"
 
 [profile.release]
@@ -17,8 +18,7 @@ find_folder = "0.*"
 gfx = "0.16"
 gfx_device_gl = { version = "0.14", optional = true }
 gfx_window_glutin = { version = "0.17", optional = true }
-glutin = { version = "0.9", optional = true }
-image = "0.12"
+glutin = { version = "0.9", optional = true }image = "0.12"
 lazy_static = "0.*"
 nalgebra = "0.11"
 num = "0.1"
