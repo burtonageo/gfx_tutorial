@@ -59,7 +59,7 @@ pub fn load_obj(obj_name: &str)
                 norms.push(object.normals[n0 as usize]);
                 norms.push(object.normals[n2 as usize]);
             }
-            _ => unimplemented!(),
+            _ => { println!("{:?}", s);  unimplemented!() }
         }
     }
 

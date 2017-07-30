@@ -1,18 +1,19 @@
-use super::{Backend, Window, WinitWindowExt};
-use gfx_device_gl::{Device, Factory, Resources};
+use super::{Backend, FactoryExt, WindowExt};
+use gfx_device_gl::{CommandBuffer, Device, Factory, Resources};
 use gfx_window_glutin;
+use gfx::Encoder;
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
-use glutin::{ContextError, Window as GlutinWindow, WindowBuilder as GlutinWindowBuilder};
+use glutin::{ContextBuilder, ContextError, GlContext, GlWindow, WindowBuilder as GlutinWindowBuilder};
 use void::Void;
 use winit;
 
-impl Window<Resources> for GlutinWindow {
+impl WindowExt<Resources> for GlWindow {
     type SwapBuffersError = ContextError;
 
     #[inline]
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError> {
-        self.swap_buffers()
+        GlContext::swap_buffers(self)
     }
 
     #[inline]
@@ -25,19 +26,17 @@ impl Window<Resources> for GlutinWindow {
     }
 }
 
-impl WinitWindowExt<Resources> for GlutinWindow {
-    fn as_winit_window(&self) -> &winit::Window {
-        self.as_winit_window()
-    }
+impl FactoryExt<Resources> for Factory {
+    type CommandBuffer = CommandBuffer;
 
-    fn as_winit_window_mut(&mut self) -> &mut winit::Window {
-        self.as_winit_window_mut()
+    fn create_encoder(&mut self) -> Encoder<Resources, Self::CommandBuffer> {
+        self.create_command_buffer().into()
     }
 }
 
-pub fn launch_gl<C, D>(wb: winit::WindowBuilder)
+pub fn launch_gl<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop)
                        -> Result<(Backend,
-                                  GlutinWindow,
+                                  GlWindow,
                                   Device,
                                   Factory,
                                   RenderTargetView<Resources, C>,
@@ -45,6 +44,7 @@ pub fn launch_gl<C, D>(wb: winit::WindowBuilder)
                                  Void>
     where C: RenderFormat,
           D: DepthFormat {
-    let (w, d, f, rtv, dst) = gfx_window_glutin::init(GlutinWindowBuilder::from_winit_builder(wb));
+
+    let (w, d, f, rtv, dst) = gfx_window_glutin::init(wb, ContextBuilder::new(), el);
     Ok((Backend::Gl, w, d, f, rtv, dst))
 }

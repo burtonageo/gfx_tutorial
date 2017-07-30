@@ -13,27 +13,44 @@ lto = true
 
 [dependencies]
 alga = "0.5"
-angular = { version = "0.1", git = "http://github.com/burtonageo/angular-rust" }
+ang = "0.2"
 find_folder = "0.*"
-gfx = "0.14"
-gfx_device_gl = "0.13"
-gfx_window_glutin = "0.14"
-glutin = "0.7"
-image = "0.12"
+gfx = "0.16"
+gfx_device_gl = { version = "0.14", optional = true }
+gfx_window_glutin = { version = "0.17", optional = true }
+glutin = { version = "0.9", optional = true }image = "0.12"
 lazy_static = "0.*"
 nalgebra = "0.11"
 num = "0.1"
+rusttype = "0.2"
 scopeguard = "0.3"
 time = "0.1"
 void = "1.0.2"
 wavefront_obj = "5.0"
-winit = "0.5.1"
+winit = "0.7"
 
-[target.'cfg(not(windows))'.dependencies.gfx_text]
-version = "0.15.0"
+[dependencies.gfx_rusttype]
+version =  "0.1"
+path = "src/gfx_rusttype"
 
-#[target.'cfg(target_os = "macos")'.dependencies.gfx_device_metal]
-#version = "0.1"
+[target.'cfg(target_os = "windows")'.dependencies.gfx_device_dx11]
+version = "0.6"
+optional = true
 
-#[target.'cfg(target_os = "macos")'.dependencies.gfx_window_metal]
-#version = "0.1"
+[target.'cfg(target_os = "windows")'.dependencies.gfx_window_dxgi]
+version = "0.9"
+optional = true
+
+[target.'cfg(target_os = "macos")'.dependencies.gfx_device_metal]
+version = "0.2"
+optional = true
+
+[target.'cfg(target_os = "macos")'.dependencies.gfx_window_metal]
+version = "0.3"
+optional = true
+
+[features]
+default = ["gl"]
+gl = ["glutin", "gfx_window_glutin", "gfx_device_gl"]
+metal = ["gfx_device_metal", "gfx_window_metal"]
+dx11 = ["gfx_device_dx11", "gfx_window_dxgi"]

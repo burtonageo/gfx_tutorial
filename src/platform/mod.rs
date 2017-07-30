@@ -1,22 +1,35 @@
 #![allow(dead_code)]
 
-use gfx::{Device, Factory, Resources};
+use gfx::{CommandBuffer, Encoder, Factory, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use std::error::Error;
 use winit;
 
+#[cfg(feature = "gl")]
 mod gl;
+#[cfg(feature = "gl")]
 pub use self::gl::launch_gl;
 
-/*
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "metal"))]
 mod metal;
-#[cfg(target_os = "macos")]
-use self::metal::launch_metal as launch_native;
-*/
+#[cfg(all(target_os = "macos", feature = "metal"))]
+pub use self::metal::launch_metal as launch_native;
 
-pub trait Window<R: Resources> {
+#[cfg(all(target_os = "windows", feature = "metal"))]
+mod dx11;
+#[cfg(all(target_os = "windows", feature = "metal"))]
+pub use self::metal::launch_dx11 as launch_native;
+
+#[cfg(all(feature = "gl", not(any(feature = "metal", feature = "dx11"))))]
+pub use self::gl::launch_gl as launch_native;
+
+#[cfg(not(any(feature = "gl", feature = "metal", feature = "dx11")))]
+pub fn launch_native(wb: winit::WindowBuilder, we: &winit::EventLoop) -> ! {
+    panic!("No api selected")
+}
+
+pub trait WindowExt<R: Resources> {
     type SwapBuffersError: Error;
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError>;
 
@@ -25,22 +38,9 @@ pub trait Window<R: Resources> {
                                                      _dsv: &mut DepthStencilView<R, D>) { }
 }
 
-pub trait WinitWindowExt<R: Resources>: Window<R> {
-    fn as_winit_window(&self) -> &winit::Window;
-    fn as_winit_window_mut(&mut self) -> &mut winit::Window;
-}
-
-pub fn launch_native<C, D>(wb: winit::WindowBuilder)
-                           -> Result<(Backend,
-                                      impl WinitWindowExt<impl Resources>,
-                                      impl Device,
-                                      impl Factory<impl Resources>,
-                                      RenderTargetView<impl Resources, C>,
-                                      DepthStencilView<impl Resources, D>),
-                                     impl Error>
-    where C: RenderFormat,
-          D: DepthFormat {
-    launch_gl(wb)
+pub trait FactoryExt<R: Resources>: Factory<R> {
+    type CommandBuffer: CommandBuffer<R>;
+    fn create_encoder(&mut self) -> Encoder<R, Self::CommandBuffer>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -48,11 +48,36 @@ pub enum Backend {
     Gl,
     Metal,
     D3d11,
+    Vulkan,
     #[doc(hidden)]
     __NonexhaustiveCheck,
 }
 
 impl Backend {
+    pub fn is_gl(&self) -> bool {
+        if let Backend::Gl = *self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_metal(&self) -> bool {
+        if let Backend::Metal = *self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_d3d11(&self) -> bool {
+        if let Backend::D3d11 = *self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn select<'a>(&self, shaders: Shaders<'a>) -> ShaderPipeline<'a> {
         use self::Backend::*;
         match *self {

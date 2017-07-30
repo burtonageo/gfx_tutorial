@@ -1,20 +1,17 @@
 #![feature(conservative_impl_trait, never_type)]
 
 extern crate alga;
-extern crate angular;
+extern crate ang;
 extern crate find_folder;
 #[macro_use]
 extern crate gfx;
-extern crate gfx_device_gl;
-#[cfg(not(windows))]
-extern crate gfx_text;
-extern crate gfx_window_glutin;
-extern crate glutin;
+extern crate gfx_rusttype;
 extern crate image;
 #[macro_use]
 extern crate lazy_static;
 extern crate num;
 extern crate nalgebra as na;
+extern crate rusttype;
 #[macro_use]
 extern crate scopeguard;
 extern crate time;
@@ -22,31 +19,46 @@ extern crate void;
 extern crate wavefront_obj;
 extern crate winit;
 
-/*
-#[cfg(target_os = "macos")]
+#[cfg(feature = "gl")]
+extern crate gfx_device_gl;
+#[cfg(feature = "gl")]
+extern crate gfx_window_glutin;
+#[cfg(feature = "gl")]
+extern crate glutin;
+
+#[cfg(all(target_os = "macos", feature = "metal"))]
 extern crate gfx_window_metal;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "metal"))]
 extern crate gfx_device_metal;
-*/
+
+#[cfg(all(target_os = "windows", feature = "dx11"))]
+extern crate gfx_window_dxgi;
+#[cfg(all(target_os = "windows", feature = "dx11"))]
+extern crate gfx_device_dx11;
 
 mod load;
-mod util;
 mod platform;
+mod util;
 
-use angular::{Angle, Degrees};
-use gfx::{Bundle, CommandBuffer, Device, Encoder, Factory, Resources};
+use ang::{Angle, Degrees};
+use gfx::{Bundle, Device, Factory, Resources};
+use gfx::format::Rgba8;
 use gfx::format::{Depth, RenderFormat, Rgba8};
 use gfx::handle::RenderTargetView;
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
+use gfx_rusttype::{Color, TextRenderer, StyledText};
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
-use num::Zero;
-use platform::{Window, WinitWindowExt as PlatformWindow};
+use num::{cast, NumCast, One, Zero};
+use platform::{FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use rusttype::{FontCollection, point, Scale};
 use std::env::args;
+use std::ops::{Deref, Div, Neg};
+use std::path::Path;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
-use util::get_assets_folder;
+use util::{get_assets_folder, open_file_relative_to_assets};
 
 gfx_defines! {
     vertex Vertex {
@@ -83,12 +95,16 @@ gfx_defines! {
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
         camera: gfx::ConstantBuffer<Camera> = "main_camera",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
-        main_depth: gfx::DepthTarget<gfx::format::Depth> = gfx::preset::depth::LESS_EQUAL_WRITE,
+        main_depth: gfx::DepthTarget<gfx::format::DepthStencil> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
 }
 
-const VERT_SRC: &'static [u8] = include_bytes!("../data/shader/standard.vs");
-const FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/standard.fs");
+const GLSL_VERT_SRC: &'static [u8] = include_bytes!("../data/shader/glsl/standard.vs");
+const GLSL_FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/glsl/standard.fs");
+
+const MSL_VERT_SRC: &'static [u8] = include_bytes!("../data/shader/msl/standard.vs");
+const MSL_FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/msl/standard.fs");
+
 const CLEAR_COLOR: [f32; 4] = [0.005, 0.005, 0.1, 1.0];
 
 #[derive(Debug)]
@@ -104,7 +120,7 @@ impl Input {
     fn new() -> Self {
         Input {
             position: Point3::new(0.0, 0.0, 10.0),
-            horizontal_angle: Angle::full(),
+            horizontal_angle: Angle::zero(),
             vertical_angle: Angle::zero(),
             fov: Angle::eighth(),
         }
@@ -147,21 +163,26 @@ impl From<Light> for ShaderLight {
 const MAX_LIGHTS: usize = 10;
 
 fn main() {
+    let mut events_loop = winit::EventsLoop::new();
     let (win_w, win_h) = winit::get_primary_monitor().get_dimensions();
     let builder = winit::WindowBuilder::new()
         .with_dimensions(win_w, win_h)
         .with_title("Gfx Example");
 
-    let (_backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_gl::<Rgba8, Depth>(builder)
+    let (backend, window, mut device, mut factory, main_color, main_depth) =
+        platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(builder, &events_loop)
             .expect("Could not create window or graphics device");
 
-    window.set_cursor_state(glutin::CursorState::Hide).expect("Could not set cursor state");
-    window.set_cursor_state(glutin::CursorState::Grab).expect("Could not set cursor state");
+    window.hide_and_grab_cursor().expect("Could not set cursor state");
     window.center_cursor().expect("Could not set cursor position");
 
-    let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
-    let program = factory.link_program(VERT_SRC, FRAG_SRC).unwrap();
+    let mut encoder = factory.create_encoder();
+    let program = if backend.is_gl() {
+        factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
+    } else {
+        factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
+    };
+
     let pso = factory.create_pipeline_from_program(&program,
                                       gfx::Primitive::TriangleList,
                                       gfx::state::Rasterizer::new_fill().with_cull_back(),
@@ -202,7 +223,11 @@ fn main() {
     let mut last = PreciseTime::now();
     let mut is_paused = false;
 
-    'main: loop {
+    let mut show_fps = false;
+    let mut is_running = true;
+    let mut fps_string = String::with_capacity(12); // enough space to display "fps: xxx.yy"
+
+    while is_running {
         let current = PreciseTime::now();
         let dt = last.to(current);
         let dt_s = dt.num_nanoseconds().unwrap_or(0) as f32 / 1_000_000_000.0f32;
@@ -230,7 +255,7 @@ fn main() {
         if cfg!(target_os = "macos") {
             static mut WINDOW_LAST_W: i32 = 0;
             static mut WINDOW_LAST_H: i32 = 0;
-            let (w, h) = window.get_size_signed_or_default();
+            let (w, h) = window.windowext_get_inner_size();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
                     window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
@@ -241,49 +266,70 @@ fn main() {
             }
         }
 
-        for e in window.as_winit_window().poll_events() {
-            use winit::{ElementState, Event, VirtualKeyCode};
-            match e {
-                Event::Closed |
-                Event::KeyboardInput(_, _, Some(VirtualKeyCode::Escape)) => break 'main,
-                #[cfg(not(target_os = "macos"))]
-                Event::Resized(_w, _h) => {
-                    window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
-                    projection.set_aspect(window.aspect());
-                }
-                Event::MouseMoved(x, y) => {
-                    let (ww, wh) = window.get_size_signed_or_default();
+        events_loop.poll_events(|event| {
+            use winit::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+            match event {
+                Event::WindowEvent { event, .. } => {
+                    match event {
+                        WindowEvent::Closed |
+                        WindowEvent::KeyboardInput { input: KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Escape), .. }, .. } => {
+                            is_running = false;
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        WindowEvent::Resized(w, h) => {
+                            window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
+                            projection.set_aspect(window.aspect());
+                        }
+                        WindowEvent::MouseMoved { position: (x, y), .. } => {
+                            let (ww, wh) = window.windowext_get_inner_size::<f32>();
+                            let hidpi = window.hidpi_factor() as f64;
 
-                    iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2 - x) as f32);
-                    iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2 - y) as f32);
+                            iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2.0 - (x / hidpi) as f32));
+                            iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2.0 - (y / hidpi) as f32));
 
-                    iput.horizontal_angle = iput.horizontal_angle.normalized();
-                    iput.vertical_angle = iput.vertical_angle.normalized();
+                            iput.horizontal_angle = iput.horizontal_angle.normalized();
 
-                    window.center_cursor().expect("Could not set cursor position");
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Up)) => {
-                    iput.position -= direction * SPEED * dt_s;
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Down)) => {
-                    iput.position += direction * SPEED * dt_s;
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Left)) => {
-                    iput.position += right * SPEED * dt_s;
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Right)) => {
-                    iput.position -= right * SPEED * dt_s;
-                }
-                Event::KeyboardInput(ElementState::Released, _, Some(VirtualKeyCode::Space)) => {
-                    fps.show_fps = !fps.show_fps;
-                }
-                Event::Focused(gained) => {
-                    is_paused = !gained;
-                    continue;
+                            let threshold = Angle::quarter() - Degrees(1.0f32);
+
+                            if iput.vertical_angle > threshold {
+                                iput.vertical_angle = threshold;
+                            }
+
+                            if iput.vertical_angle < threshold.neg() {
+                                iput.vertical_angle = threshold.neg();
+                            }
+
+                            window.center_cursor().expect("Could not set cursor position");
+                        }
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            match input {
+                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Up), .. } => {
+                                    iput.position -= direction * SPEED * dt_s;
+                                }
+                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Down), .. } => {
+                                    iput.position += direction * SPEED * dt_s;
+                                }
+                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Left), .. } => {
+                                    iput.position += right * SPEED * dt_s;
+                                }
+                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Right), .. } => {
+                                    iput.position -= right * SPEED * dt_s;
+                                }
+                                KeyboardInput { state: ElementState::Released, virtual_keycode: Some(VirtualKeyCode::Space), .. } => {
+                                    show_fps = !show_fps;
+                                }
+                                _ => {}
+                            }
+                        }
+                        WindowEvent::Focused(gained) => {
+                            is_paused = !gained;
+                        }
+                        _ => (),
+                    }
                 }
                 _ => (),
             }
-        }
+        });
 
         if is_paused {
             continue;
@@ -333,11 +379,42 @@ fn main() {
         encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
 
         bundle.encode(&mut encoder);
-
         fps.render(dt_s, &mut encoder, &bundle.data.out);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
+    }
+}
+
+trait WindowExt {
+   fn center_cursor(&self) -> Result<(), ()>;
+    fn hide_and_grab_cursor(&self) -> Result<(), String>;
+    fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N);
+    fn aspect<N: Default + Div<Output=N> + NumCast + Zero + One>(&self) -> N {
+        let (w, h) = self.windowext_get_inner_size::<N>();
+        w / h
+    }
+}
+
+impl WindowExt for winit::Window {
+    fn center_cursor(&self) -> Result<(), ()> {
+        let (ww, wh) = self.windowext_get_inner_size::<i32>();
+        self.set_cursor_position(ww / 2, wh / 2)
+    }
+
+    fn hide_and_grab_cursor(&self) -> Result<(), String> {
+        self.set_cursor_state(winit::CursorState::Hide)?;
+        self.set_cursor_state(winit::CursorState::Grab)
+    }
+
+    fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N) {
+        fn cast_pair<N: NumCast + Zero>((x, y): (u32, u32)) -> (N, N) {
+            (cast(x).unwrap_or(Zero::zero()), cast(y).unwrap_or(Zero::zero()))
+        }
+
+        self.get_inner_size_pixels()
+            .map(cast_pair)
+            .unwrap_or(Default::default())
     }
 }
 
@@ -404,33 +481,5 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
         C: CommandBuffer<R>,
         T: RenderFormat,
     {
-    }
-}
-
-trait WindowExt<R: Resources>: PlatformWindow<R> {
-    fn center_cursor(&self) -> Result<(), ()>;
-    fn get_size_signed_or_default(&self) -> (i32, i32);
-    fn aspect(&self) -> f32 {
-        let (w, h) = self.get_size_signed_or_default();
-        w as f32 / h as f32
-    }
-}
-
-impl<R: Resources, W: PlatformWindow<R>> WindowExt<R> for W {
-    fn center_cursor(&self) -> Result<(), ()> {
-        let (ww, wh) = self.get_size_signed_or_default();
-        self.as_winit_window().set_cursor_position(ww as i32 / 2, wh as i32 / 2)
-    }
-
-    fn get_size_signed_or_default(&self) -> (i32, i32) {
-        fn u32pair_toi32pair((x, y): (u32, u32)) -> (i32, i32) {
-            (x as i32, y as i32)
-        }
-
-        self.as_winit_window()
-            .get_inner_size()
-            .or(Some(winit::get_primary_monitor().get_dimensions()))
-            .map(u32pair_toi32pair)
-            .unwrap()
     }
 }
