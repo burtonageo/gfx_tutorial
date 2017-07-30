@@ -4,7 +4,7 @@ use gfx_window_glutin;
 use gfx::Encoder;
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
-use glutin::{ContextBuilder, ContextError, GlWindow, WindowBuilder as GlutinWindowBuilder};
+use glutin::{ContextBuilder, ContextError, GlContext, GlWindow, WindowBuilder as GlutinWindowBuilder};
 use void::Void;
 use winit;
 
@@ -13,7 +13,7 @@ impl WindowExt<Resources> for GlWindow {
 
     #[inline]
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError> {
-        self.swap_buffers()
+        GlContext::swap_buffers(self)
     }
 
     #[inline]

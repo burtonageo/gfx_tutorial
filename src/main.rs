@@ -91,7 +91,7 @@ gfx_defines! {
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
         camera: gfx::ConstantBuffer<Camera> = "main_camera",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
-        main_depth: gfx::DepthTarget<gfx::format::Depth32F> = gfx::preset::depth::LESS_EQUAL_WRITE,
+        main_depth: gfx::DepthTarget<gfx::format::DepthStencil> = gfx::preset::depth::LESS_EQUAL_WRITE,
     }
 }
 
@@ -164,7 +164,7 @@ fn main() {
         .with_decorations(false);
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_gl::<Rgba8, gfx::format::Depth32F>(builder, &events_loop)
+        platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(builder, &events_loop)
             .expect("Could not create window or graphics device");
 
     window.hide_and_grab_cursor().expect("Could not set cursor state");
