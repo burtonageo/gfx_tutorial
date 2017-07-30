@@ -1,4 +1,4 @@
-use super::{Backend, FactoryExt, Window, WinitWindowExt};
+use super::{Backend, FactoryExt, WindowExt};
 use winit;
 use gfx::{CombinedError, Encoder, Factory};
 use gfx::format::{DepthFormat, Formatted, RenderFormat, TextureChannel, TextureSurface};
@@ -24,17 +24,18 @@ impl Error for MetalSwapBuffersError {
     }
 }
 
-impl Window<Resources> for MetalWindow {
-    type SwapBuffersError = MetalSwapBuffersError;
-
-    fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError> {
-        MetalWindow::swap_buffers(self).map_err(|()| MetalSwapBuffersError(()))
+impl From<()> for MetalSwapBuffersError {
+    #[inline]
+    fn from(_: ()) -> Self {
+        MetalSwapBuffersError(())
     }
 }
 
-impl WinitWindowExt<Resources> for MetalWindow {
-    fn as_winit_window(&self) -> &winit::Window {
-        &*self
+impl WindowExt<Resources> for MetalWindow {
+    type SwapBuffersError = MetalSwapBuffersError;
+
+    fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError> {
+        MetalWindow::swap_buffers(self).map_err(From::from)
     }
 }
 
@@ -84,7 +85,7 @@ impl From<CombinedError> for MetalInitError {
     }
 }
 
-pub fn launch_metal<C, D>(wb: winit::WindowBuilder)
+pub fn launch_metal<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop)
                           -> Result<(Backend,
                                      MetalWindow,
                                      Device,
@@ -96,7 +97,7 @@ pub fn launch_metal<C, D>(wb: winit::WindowBuilder)
           D: DepthFormat,
            <D as Formatted>::Channel: TextureChannel,
            <D as Formatted>::Surface: TextureSurface, {
-    let (window, device, mut factory, rtv) = init(wb)?;
+    let (window, device, mut factory, rtv) = init(wb, el)?;
     let (w, h) = window.get_inner_size_points().unwrap_or((0, 0));
     let dsv = factory.create_depth_stencil_view_only(w as Size, h as Size)?;
     Ok((Backend::Metal, window, device, factory, rtv, dsv))

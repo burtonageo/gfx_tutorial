@@ -6,33 +6,36 @@ use gfx::handle::{DepthStencilView, RenderTargetView};
 use std::error::Error;
 use winit;
 
+#[cfg(feature = "gl")]
 mod gl;
+#[cfg(feature = "gl")]
 pub use self::gl::launch_gl;
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "metal"))]
 mod metal;
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "metal"))]
 pub use self::metal::launch_metal as launch_native;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "metal"))]
 mod dx11;
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", feature = "metal"))]
 pub use self::metal::launch_dx11 as launch_native;
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(all(feature = "gl", not(any(feature = "metal", feature = "dx11"))))]
 pub use self::gl::launch_gl as launch_native;
 
-pub trait Window<R: Resources> {
+#[cfg(not(any(feature = "gl", feature = "metal", feature = "dx11")))]
+pub fn launch_native(wb: winit::WindowBuilder, we: &winit::EventLoop) -> ! {
+    panic!("No api selected")
+}
+
+pub trait WindowExt<R: Resources> {
     type SwapBuffersError: Error;
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError>;
 
     fn update_views<C: RenderFormat, D: DepthFormat>(&self,
                                                      _rtv: &mut RenderTargetView<R, C>,
                                                      _dsv: &mut DepthStencilView<R, D>) { }
-}
-
-pub trait WinitWindowExt<R: Resources>: Window<R> {
-    fn as_winit_window(&self) -> &winit::Window;
 }
 
 pub trait FactoryExt<R: Resources>: Factory<R> {

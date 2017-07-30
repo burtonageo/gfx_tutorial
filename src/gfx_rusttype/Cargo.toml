@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["georgeburton"]
 
 [dependencies]
-gfx = { version = "0.14", path = "../../vendor/gfx/src/render" }
+gfx = "0.16"
 rusttype = "0.2"

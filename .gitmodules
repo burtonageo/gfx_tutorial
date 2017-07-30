@@ -1,3 +1,0 @@
-[submodule "vendor/gfx"]
-	path = vendor/gfx
-	url = https://github.com/gfx-rs/gfx

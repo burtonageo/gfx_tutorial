@@ -14,11 +14,10 @@ lto = true
 alga = "0.5"
 ang = "0.2"
 find_folder = "0.*"
-gfx = { version = "0.14", path = "./vendor/gfx/src/render" }
-gfx_device_gl = { version = "0.13", path = "./vendor/gfx/src/backend/gl" }
-gfx_rusttype = { version = "0.1", path = "./src/gfx_rusttype"}
-gfx_window_glutin = { version = "0.14", path = "./vendor/gfx/src/window/glutin" }
-glutin = "0.7"
+gfx = "0.16"
+gfx_device_gl = { version = "0.14", optional = true }
+gfx_window_glutin = { version = "0.17", optional = true }
+glutin = { version = "0.9", optional = true }
 image = "0.12"
 lazy_static = "0.*"
 nalgebra = "0.11"
@@ -28,20 +27,30 @@ scopeguard = "0.3"
 time = "0.1"
 void = "1.0.2"
 wavefront_obj = "5.0"
-winit = "0.5.1"
+winit = "0.7"
+
+[dependencies.gfx_rusttype]
+version =  "0.1"
+path = "src/gfx_rusttype"
 
 [target.'cfg(target_os = "windows")'.dependencies.gfx_device_dx11]
-version = "0.5"
-path = "./vendor/gfx/src/backend/dx11"
+version = "0.6"
+optional = true
 
 [target.'cfg(target_os = "windows")'.dependencies.gfx_window_dxgi]
-version = "0.6"
-path = "./vendor/gfx/src/window/dxgi"
+version = "0.9"
+optional = true
 
 [target.'cfg(target_os = "macos")'.dependencies.gfx_device_metal]
-version = "0.1"
-path = "./vendor/gfx/src/backend/metal"
+version = "0.2"
+optional = true
 
 [target.'cfg(target_os = "macos")'.dependencies.gfx_window_metal]
-version = "0.1"
-path = "./vendor/gfx/src/window/metal"
+version = "0.3"
+optional = true
+
+[features]
+default = ["gl"]
+gl = ["glutin", "gfx_window_glutin", "gfx_device_gl"]
+metal = ["gfx_device_metal", "gfx_window_metal"]
+dx11 = ["gfx_device_dx11", "gfx_window_dxgi"]
