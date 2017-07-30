@@ -41,8 +41,7 @@ mod platform;
 mod util;
 
 use ang::{Angle, Degrees};
-use gfx::{Bundle, Device, Factory, Resources};
-use gfx::format::Rgba8;
+use gfx::{Bundle, CommandBuffer, Device, Encoder, Factory, Resources};
 use gfx::format::{Depth, RenderFormat, Rgba8};
 use gfx::handle::RenderTargetView;
 use gfx::texture::{AaMode, Kind};
@@ -276,7 +275,7 @@ fn main() {
                             is_running = false;
                         }
                         #[cfg(not(target_os = "macos"))]
-                        WindowEvent::Resized(w, h) => {
+                        WindowEvent::Resized(..) => {
                             window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
                             projection.set_aspect(window.aspect());
                         }
