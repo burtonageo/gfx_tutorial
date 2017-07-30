@@ -42,19 +42,17 @@ mod util;
 
 use ang::{Angle, Degrees};
 use gfx::{Bundle, CommandBuffer, Device, Encoder, Factory, Resources};
-use gfx::format::{Depth, RenderFormat, Rgba8};
+use gfx::format::{RenderFormat, Rgba8};
 use gfx::handle::RenderTargetView;
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
-use gfx_rusttype::{Color, TextRenderer, StyledText};
+use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::{cast, NumCast, One, Zero};
 use platform::{FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
-use rusttype::{FontCollection, point, Scale};
 use std::env::args;
-use std::ops::{Deref, Div, Neg};
-use std::path::Path;
+use std::ops::{Div, Neg};
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
 use util::{get_assets_folder, open_file_relative_to_assets};
@@ -224,7 +222,6 @@ fn main() {
 
     let mut show_fps = false;
     let mut is_running = true;
-    let mut fps_string = String::with_capacity(12); // enough space to display "fps: xxx.yy"
 
     while is_running {
         let current = PreciseTime::now();
@@ -280,11 +277,11 @@ fn main() {
                             projection.set_aspect(window.aspect());
                         }
                         WindowEvent::MouseMoved { position: (x, y), .. } => {
-                            let (ww, wh) = window.windowext_get_inner_size::<f32>();
+                            let (ww, wh) = window.windowext_get_inner_size::<i32>();
                             let hidpi = window.hidpi_factor() as f64;
 
-                            iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * (ww / 2.0 - (x / hidpi) as f32));
-                            iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * (wh / 2.0 - (y / hidpi) as f32));
+                            iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * ((ww / 2) as f32 - (x / hidpi) as f32));
+                            iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * ((wh / 2) as f32 - (y / hidpi) as f32));
 
                             iput.horizontal_angle = iput.horizontal_angle.normalized();
 
