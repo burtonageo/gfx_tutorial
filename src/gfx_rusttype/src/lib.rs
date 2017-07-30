@@ -13,7 +13,9 @@ use gfx::traits::FactoryExt;
 use rusttype::{FontCollection, Point, Scale};
 use rusttype::gpu_cache::{Cache as GpuCache, CacheReadErr, CacheWriteErr};
 use std::error::Error as StdError;
-use std::fmt;
+use std::fs::File;
+use std::{fmt, io};
+use std::path::Path;
 
 pub struct TextRenderer<R: Resources> {
     font_cache: GpuCache,
@@ -147,6 +149,65 @@ gfx_defines! {
         text_sampler: gfx::TextureSampler<[f32; 4]> = "f_TextSampler",
         locals: gfx::ConstantBuffer<Locals> = "f_TextLocals",
         out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
+    }
+}
+
+fn read_fonts(font_paths: &[&Path]) -> Result<FontCollection<'static>, ReadFontsError> {
+    use io::Read;
+
+    let open_font_asset = |&p| Ok(Box::new(File::open(p)?) as Box<Read>);
+    let first = font_paths.get(0).ok_or(ReadFontsError::NoPathsGiven)?;
+
+    let all_fonts = font_paths[1..]
+        .iter()
+        .map(&open_font_asset)
+        .collect::<Result<Vec<_>, io::Error>>()?;
+    let mut all_fonts = all_fonts.into_iter().fold(open_font_asset(first)?, |f0, f1| Box::new(f0.chain(f1)));
+
+    let mut bytes = vec![];
+    all_fonts.read_to_end(&mut bytes)?;
+    Ok(FontCollection::from_bytes(bytes))
+}
+
+#[derive(Debug)]
+pub enum ReadFontsError {
+    NoPathsGiven,
+    Io(io::Error),
+} 
+
+impl fmt::Display for ReadFontsError {
+    #[inline]
+    fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ReadFontsError::NoPathsGiven => fmtr.pad(self.description()),
+            ReadFontsError::Io(ref e) => write!(fmtr, "{}: {}", self.description(), e),
+        }
+    }
+}
+
+impl StdError for ReadFontsError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            ReadFontsError::NoPathsGiven => "no paths given to read font data",
+            ReadFontsError::Io(_) => "an IO error occurred",
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&StdError> {
+        if let ReadFontsError::Io(ref e) = *self {
+            Some(e)
+        } else {
+            None
+        }
+    }
+}
+
+impl From<io::Error> for ReadFontsError {
+    #[inline]
+    fn from(e: io::Error) -> Self {
+        ReadFontsError::Io(e)
     }
 }
 
