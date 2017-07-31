@@ -13,12 +13,14 @@ use std::error::Error;
 pub struct MetalSwapBuffersError(());
 
 impl fmt::Display for MetalSwapBuffersError {
+    #[inline]
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
         fmtr.pad(self.description())
     }
 }
 
 impl Error for MetalSwapBuffersError {
+    #[inline]
     fn description(&self) -> &str {
         "an error occurred while swapping the window buffers"
     }
