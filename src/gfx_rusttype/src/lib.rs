@@ -152,7 +152,7 @@ gfx_defines! {
     }
 }
 
-fn read_fonts(font_paths: &[&Path]) -> Result<FontCollection<'static>, ReadFontsError> {
+pub fn read_fonts(font_paths: &[&Path]) -> Result<FontCollection<'static>, ReadFontsError> {
     use io::Read;
 
     let open_font_asset = |&p| Ok(Box::new(File::open(p)?) as Box<Read>);
