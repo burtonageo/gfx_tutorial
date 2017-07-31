@@ -1,10 +1,10 @@
-use super::{Backend, FactoryExt, WindowExt};
+use super::{Backend, ContextBuilder, FactoryExt, WindowExt};
 use gfx_device_gl::{CommandBuffer, Device, Factory, Resources};
 use gfx_window_glutin;
 use gfx::Encoder;
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
-use glutin::{ContextBuilder, ContextError, GlContext, GlWindow, WindowBuilder as GlutinWindowBuilder};
+use glutin::{ContextBuilder as GlutinContextBuilder, ContextError, GlContext, GlWindow};
 use void::Void;
 use winit;
 
@@ -34,7 +34,7 @@ impl FactoryExt<Resources> for Factory {
     }
 }
 
-pub fn launch_gl<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop)
+pub fn launch_gl<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop, cb: ContextBuilder)
                        -> Result<(Backend,
                                   GlWindow,
                                   Device,
@@ -45,6 +45,13 @@ pub fn launch_gl<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop)
     where C: RenderFormat,
           D: DepthFormat {
 
-    let (w, d, f, rtv, dst) = gfx_window_glutin::init(wb, ContextBuilder::new(), el);
+    let (w, d, f, rtv, dst) = gfx_window_glutin::init(wb, cb.into(), el);
     Ok((Backend::Gl, w, d, f, rtv, dst))
+}
+
+impl<'a> Into<GlutinContextBuilder<'a>> for ContextBuilder {
+    fn into(self) -> GlutinContextBuilder<'a> {
+        let cb = GlutinContextBuilder::new();
+        cb.with_vsync(self.is_vsync_enabled)
+    }
 }

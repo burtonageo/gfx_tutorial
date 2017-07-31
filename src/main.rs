@@ -50,7 +50,7 @@ use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
 use load::load_obj;
 use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::{cast, NumCast, One, Zero};
-use platform::{FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::env::args;
 use std::ops::{Div, Neg};
 use std::time::Duration as StdDuration;
@@ -167,7 +167,11 @@ fn main() {
         .with_title("Gfx Example");
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(builder, &events_loop)
+        platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(
+                builder,
+                &events_loop,
+                ContextBuilder::new().with_vsync_enabled(true),
+            )
             .expect("Could not create window or graphics device");
 
     window.hide_and_grab_cursor().expect("Could not set cursor state");
@@ -425,6 +429,20 @@ struct FpsRenderer<R: Resources, F: Factory<R>> {
 impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
     #[inline]
     fn new(factory: F) -> Result<Self, gfx_text::Error> {
+        /*
+        let mut text_renderer = {
+            const POS_TOLERANCE: f32 = 0.1;
+            const SCALE_TOLERANCE: f32 = 0.1;
+            let (w, h) = window.windowext_get_inner_size::<u16>();
+            TextRenderer::new(&mut factory, data.out.clone(), w, h, POS_TOLERANCE, SCALE_TOLERANCE,
+                            read_fonts("fonts/noto_sans/NotoSans-Regular.ttf".as_ref(),
+                                        &["fonts/noto_sans/NotoSans-Bold.ttf".as_ref(),
+                                        "fonts/noto_sans/NotoSans-Italic.ttf".as_ref(),
+                                        "fonts/noto_sans/NotoSans-BoldItalic.ttf".as_ref()]).unwrap())
+                .expect("Could not create text renderer")
+        };
+        */
+
         FpsRenderer {
             show_fps: false,
             fps_string: String::with_capacity(12), // enough space to display "fps: xxx.yy"

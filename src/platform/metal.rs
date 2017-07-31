@@ -1,4 +1,4 @@
-use super::{Backend, FactoryExt, WindowExt};
+use super::{Backend, ContextBuilder, FactoryExt, WindowExt};
 use winit;
 use gfx::{CombinedError, Encoder, Factory};
 use gfx::format::{DepthFormat, Formatted, RenderFormat, TextureChannel, TextureSurface};
@@ -87,7 +87,7 @@ impl From<CombinedError> for MetalInitError {
     }
 }
 
-pub fn launch_metal<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop)
+pub fn launch_metal<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop, _: ContextBuilder)
                           -> Result<(Backend,
                                      MetalWindow,
                                      Device,

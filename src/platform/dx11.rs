@@ -25,7 +25,7 @@ impl FactoryExt<Resources> for Factory {
     }
 }
 
-pub fn launch_dx11<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop)
+pub fn launch_dx11<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop, _: ContextBuilder)
                           -> Result<(Backend,
                                      DxgiWindow,
                                      Device,

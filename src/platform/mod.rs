@@ -4,7 +4,6 @@ use gfx::{CommandBuffer, Encoder, Factory, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use std::error::Error;
-use winit;
 
 #[cfg(feature = "gl")]
 mod gl;
@@ -16,16 +15,33 @@ mod metal;
 #[cfg(all(target_os = "macos", feature = "metal"))]
 pub use self::metal::launch_metal as launch_native;
 
-#[cfg(all(target_os = "windows", feature = "metal"))]
+#[cfg(all(target_os = "windows", feature = "dx11"))]
 mod dx11;
-#[cfg(all(target_os = "windows", feature = "metal"))]
-pub use self::metal::launch_dx11 as launch_native;
+#[cfg(all(target_os = "windows", feature = "dx11"))]
+pub use self::dx11::launch_dx11 as launch_native;
 
 #[cfg(all(feature = "gl", not(any(feature = "metal", feature = "dx11"))))]
 pub use self::gl::launch_gl as launch_native;
 
+#[derive(Debug, Default)]
+pub struct ContextBuilder {
+    pub is_vsync_enabled: bool,
+}
+
+impl ContextBuilder {
+    #[inline]
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    #[inline]
+    pub fn with_vsync_enabled(self, vsync_enabled: bool) -> Self {
+        ContextBuilder { is_vsync_enabled: vsync_enabled, ..self }
+    }
+}
+
 #[cfg(not(any(feature = "gl", feature = "metal", feature = "dx11")))]
-pub fn launch_native(wb: winit::WindowBuilder, we: &winit::EventLoop) -> ! {
+pub fn launch_native(wb: ::winit::WindowBuilder, we: &::winit::EventLoop) -> ! {
     panic!("No api selected")
 }
 
