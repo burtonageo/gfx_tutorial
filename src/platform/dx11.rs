@@ -1,4 +1,4 @@
-use super::{Backend, FactoryExt, WindowExt};
+use super::{Backend, ContextBuilder, FactoryExt, WindowExt};
 use gfx::{CombinedError, Encoder};
 use gfx::format::{DepthFormat, Formatted, RenderFormat, TextureChannel, TextureSurface};
 use gfx::handle::{DepthStencilView, RenderTargetView};
