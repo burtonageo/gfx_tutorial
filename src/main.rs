@@ -38,25 +38,22 @@ extern crate gfx_device_dx11;
 
 mod load;
 mod platform;
+mod model;
 mod util;
 
 use ang::{Angle, Degrees};
-use gfx::{Bundle, CommandBuffer, Device, Encoder, Factory, Resources};
+use gfx::{CommandBuffer, Device, Encoder, Factory, Resources};
 use gfx::format::{RenderFormat, Rgba8};
-use gfx::handle::{DepthStencilView, RenderTargetView};
-use gfx::texture::{AaMode, Kind};
-use gfx::traits::FactoryExt;
+use gfx::handle::{RenderTargetView};
 use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
-use load::load_obj;
-use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, Rotation3, Similarity3,
-         UnitQuaternion, Vector3};
+use model::Model;
+use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, UnitQuaternion, Vector3};
 use num::{cast, NumCast, One, Zero};
-use platform::{Backend, ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::env::args;
 use std::ops::{Div, Neg};
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
-use util::{get_assets_folder, open_file_relative_to_assets};
 
 gfx_defines! {
     vertex Vertex {
@@ -124,6 +121,21 @@ impl Input {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+struct Camera {
+    perspective: Perspective3<f32>,
+    view: Isometry3<f32>,
+}
+
+#[allow(dead_code)]
+impl Camera {
+    #[inline]
+    fn matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
+        (self.perspective.to_homogeneous(), self.view.to_homogeneous())
+    }
+}
+
 const SPEED: f32 = 4.0;
 const MOUSE_SPEED: f32 = 7.0;
 
@@ -158,110 +170,6 @@ impl From<Light> for ShaderLight {
 }
 
 const MAX_LIGHTS: usize = 10;
-
-struct Model<R: Resources> {
-    bundle: Bundle<R, pipe::Data<R>>,
-    pub similarity: Similarity3<f32>,
-}
-
-impl<R: Resources> Model<R> {
-    fn load<F: PlFactoryExt<R>>(
-        factory: &mut F,
-        backend: &Backend,
-        rtv: RenderTargetView<R, ColorFormat>,
-        dsv: DepthStencilView<R, DepthFormat>,
-        model_name: &str,
-        texture_name: &str,
-    ) -> Result<Self, load::LoadObjError> {
-        let program = if backend.is_gl() {
-            factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
-        } else {
-            factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
-        };
-
-        let pso = factory
-            .create_pipeline_from_program(
-                &program,
-                gfx::Primitive::TriangleList,
-                gfx::state::Rasterizer::new_fill().with_cull_back(),
-                pipe::new(),
-            )
-            .expect("Could not create pso");
-
-        let (_, srv) = {
-            let mut img_path = get_assets_folder().unwrap().to_path_buf();
-            img_path.push(texture_name);
-            let img = image::open(img_path)
-                .expect("Could not open image")
-                .to_rgba();
-            let (iw, ih) = img.dimensions();
-            let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
-            factory
-                .create_texture_immutable_u8::<Rgba8>(kind, &[&img])
-                .expect("Could not create texture")
-        };
-
-        let sampler = factory.create_sampler_linear();
-
-        let (verts, inds) = load_obj(model_name).expect("Could not load obj file");
-        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
-        let data = pipe::Data {
-            vbuf: vertex_buffer,
-            vert_locals: factory.create_constant_buffer(1),
-            shared_locals: factory.create_constant_buffer(1),
-            lights: factory.create_constant_buffer(MAX_LIGHTS),
-            main_texture: (srv, sampler),
-            out: rtv,
-            main_depth: dsv,
-        };
-        
-        let bundle = Bundle::new(slice, pso, data);
-        let similarity = Similarity3::from_scaling(1.0);
-        Ok(Model { bundle, similarity })
-    }
-
-    #[inline]
-    fn encode<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>) {
-        self.bundle.encode(encoder)
-    }
-
-    #[inline]
-    fn update_matrices<C: CommandBuffer<R>>(
-        &self,
-        encoder: &mut Encoder<R, C>,
-        view_matrix: &Matrix4<f32>,
-        projection_matrix: &Matrix4<f32>,
-    ) {
-        let model_matrix = self.similarity.to_homogeneous();
-        encoder.update_constant_buffer(
-            &self.bundle.data.vert_locals,
-            &VertLocals {
-                model: *(model_matrix).as_ref(),
-                view: *(view_matrix).as_ref(),
-                projection: *(projection_matrix).as_ref(),
-            },
-        );
-    }
-
-    #[inline]
-    fn update_lights<C: CommandBuffer<R>>(
-        &self,
-        encoder: &mut Encoder<R, C>,
-        lights: &[ShaderLight],
-    ) {
-        let num_lights = lights.len() as u32;
-        assert!(num_lights < MAX_LIGHTS as u32);
-        encoder.update_constant_buffer(&self.bundle.data.shared_locals, &SharedLocals { num_lights });
-        encoder
-            .update_buffer(&self.bundle.data.lights, &lights, 0)
-            .expect("Could not update buffer");
-    }
-
-    #[inline]
-    fn update_views<W: PlatformWindow<R>>(&mut self, window: &W) {
-        window.update_views(&mut self.bundle.data.out, &mut self.bundle.data.main_depth);
-    }
-}
 
 fn main() {
     let mut events_loop = winit::EventsLoop::new();

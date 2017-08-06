@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
-use gfx::{CommandBuffer, Encoder, Factory, Resources};
+use gfx::{CommandBuffer, Encoder, Resources};
 use gfx::format::{DepthFormat, RenderFormat};
 use gfx::handle::{DepthStencilView, RenderTargetView};
+use gfx::traits;
 use std::error::Error;
 
 #[cfg(feature = "gl")]
@@ -60,7 +61,7 @@ pub trait WindowExt<R: Resources> {
     }
 }
 
-pub trait FactoryExt<R: Resources>: Factory<R> {
+pub trait FactoryExt<R: Resources>: traits::FactoryExt<R> {
     type CommandBuffer: CommandBuffer<R>;
     fn create_encoder(&mut self) -> Encoder<R, Self::CommandBuffer>;
 }
