@@ -172,28 +172,33 @@ impl<R: Resources> Model<R> {
         rtv: RenderTargetView<R, ColorFormat>,
         dsv: DepthStencilView<R, DepthFormat>,
         model_name: &str,
-        texture_name: &str
-    ) -> Result<Self, load::LoadObjError>
-    {
+        texture_name: &str,
+    ) -> Result<Self, load::LoadObjError> {
         let program = if backend.is_gl() {
             factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
         } else {
             factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
         };
 
-        let pso = factory.create_pipeline_from_program(&program,
-                                        gfx::Primitive::TriangleList,
-                                        gfx::state::Rasterizer::new_fill().with_cull_back(),
-                                        pipe::new())
+        let pso = factory
+            .create_pipeline_from_program(
+                &program,
+                gfx::Primitive::TriangleList,
+                gfx::state::Rasterizer::new_fill().with_cull_back(),
+                pipe::new(),
+            )
             .expect("Could not create pso");
 
         let (_, srv) = {
             let mut img_path = get_assets_folder().unwrap().to_path_buf();
             img_path.push(texture_name);
-            let img = image::open(img_path).expect("Could not open image").to_rgba();
+            let img = image::open(img_path)
+                .expect("Could not open image")
+                .to_rgba();
             let (iw, ih) = img.dimensions();
             let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
-            factory.create_texture_immutable_u8::<Rgba8>(kind, &[&img])
+            factory
+                .create_texture_immutable_u8::<Rgba8>(kind, &[&img])
                 .expect("Could not create texture")
         };
 
@@ -228,19 +233,27 @@ impl<R: Resources> Model<R> {
         view_matrix: &Matrix4<f32>,
         projection_matrix: &Matrix4<f32>,
     ) {
-        encoder.update_constant_buffer(&self.0.data.vert_locals,
-                                       &VertLocals {
-                                           model: *(model_matrix).as_ref(),
-                                           view: *(view_matrix).as_ref(),
-                                           projection: *(projection_matrix).as_ref(),
-                                       });
+        encoder.update_constant_buffer(
+            &self.0.data.vert_locals,
+            &VertLocals {
+                model: *(model_matrix).as_ref(),
+                view: *(view_matrix).as_ref(),
+                projection: *(projection_matrix).as_ref(),
+            },
+        );
     }
 
     #[inline]
-    fn update_lights<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>, lights: &[ShaderLight]) {
+    fn update_lights<C: CommandBuffer<R>>(
+        &self,
+        encoder: &mut Encoder<R, C>,
+        lights: &[ShaderLight],
+    ) {
         let num_lights = lights.len() as u32;
         encoder.update_constant_buffer(&self.0.data.shared_locals, &SharedLocals { num_lights });
-        encoder.update_buffer(&self.0.data.lights, &lights, 0).expect("Could not update buffer");
+        encoder
+            .update_buffer(&self.0.data.lights, &lights, 0)
+            .expect("Could not update buffer");
     }
 
     #[inline]
@@ -262,14 +275,17 @@ fn main() {
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
         platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(
-                builder,
-                &events_loop,
-                ContextBuilder::new().with_vsync_enabled(true),
-            )
-            .expect("Could not create window or graphics device");
+            builder,
+            &events_loop,
+            ContextBuilder::new().with_vsync_enabled(true),
+        ).expect("Could not create window or graphics device");
 
-    window.hide_and_grab_cursor().expect("Could not set cursor state");
-    window.center_cursor().expect("Could not set cursor position");
+    window.hide_and_grab_cursor().expect(
+        "Could not set cursor state",
+    );
+    window.center_cursor().expect(
+        "Could not set cursor position",
+    );
 
     let mut encoder = factory.create_encoder();
     let mut model = Model::load(
@@ -278,7 +294,8 @@ fn main() {
         main_color.clone(),
         main_depth.clone(),
         &args().nth(1).unwrap_or("suzanne".into()),
-        "img/checker.png").expect("Could not load model");
+        "img/checker.png",
+    ).expect("Could not load model");
 
     let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
 
@@ -306,13 +323,17 @@ fn main() {
             std::thread::sleep(sleep_time);
         });
 
-        let direction = Vector3::new(iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
-                                     iput.vertical_angle.sin(),
-                                     iput.vertical_angle.cos() * iput.horizontal_angle.cos());
+        let direction = Vector3::new(
+            iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
+            iput.vertical_angle.sin(),
+            iput.vertical_angle.cos() * iput.horizontal_angle.cos(),
+        );
 
-        let right = Vector3::new((iput.horizontal_angle - Angle::quarter()).sin(),
-                                 na::zero(),
-                                 (iput.horizontal_angle - Angle::quarter()).cos());
+        let right = Vector3::new(
+            (iput.horizontal_angle - Angle::quarter()).sin(),
+            na::zero(),
+            (iput.horizontal_angle - Angle::quarter()).cos(),
+        );
 
         // Hack to get around lack of resize event on MacOS
         // https://github.com/tomaka/winit/issues/39
@@ -403,9 +424,11 @@ fn main() {
 
         let view = {
             let up = right.cross(&direction);
-            Isometry3::look_at_lh(&iput.position,
-                                  &PointBase::from_coordinates(iput.position.coords + direction),
-                                  &up)
+            Isometry3::look_at_lh(
+                &iput.position,
+                &PointBase::from_coordinates(iput.position.coords + direction),
+                &up,
+            )
         };
 
         encoder.clear(&main_color, CLEAR_COLOR);
@@ -449,7 +472,7 @@ trait WindowExt {
     fn center_cursor(&self) -> Result<(), ()>;
     fn hide_and_grab_cursor(&self) -> Result<(), String>;
     fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N);
-    fn aspect<N: Default + Div<Output=N> + NumCast + Zero + One>(&self) -> N {
+    fn aspect<N: Default + Div<Output = N> + NumCast + Zero + One>(&self) -> N {
         let (w, h) = self.windowext_get_inner_size::<N>();
         w / h
     }
@@ -468,12 +491,15 @@ impl WindowExt for winit::Window {
 
     fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N) {
         fn cast_pair<N: NumCast + Zero>((x, y): (u32, u32)) -> (N, N) {
-            (cast(x).unwrap_or(Zero::zero()), cast(y).unwrap_or(Zero::zero()))
+            (
+                cast(x).unwrap_or(Zero::zero()),
+                cast(y).unwrap_or(Zero::zero()),
+            )
         }
 
-        self.get_inner_size_pixels()
-            .map(cast_pair)
-            .unwrap_or(Default::default())
+        self.get_inner_size_pixels().map(cast_pair).unwrap_or(
+            Default::default(),
+        )
     }
 }
 
@@ -513,15 +539,21 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
         &mut self,
         dt_s: f32,
         encoder: &mut Encoder<R, C>,
-        target: &RenderTargetView<R, T>)
-    where
+        target: &RenderTargetView<R, T>,
+    ) where
         C: CommandBuffer<R>,
         T: RenderFormat,
     {
         if self.show_fps {
             use std::fmt::Write;
-            self.fps_string.write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s)).unwrap();
-            self.text_renderer.add(&self.fps_string, [10, 20], [0.65, 0.16, 0.16, 1.0]);
+            self.fps_string
+                .write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s))
+                .unwrap();
+            self.text_renderer.add(
+                &self.fps_string,
+                [10, 20],
+                [0.65, 0.16, 0.16, 1.0],
+            );
             self.text_renderer.draw(encoder, target).unwrap();
             self.fps_string.clear();
         }
@@ -549,8 +581,8 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
         &mut self,
         _dt_s: f32,
         _encoder: &mut Encoder<R, C>,
-        _target: &RenderTargetView<R, T>)
-    where
+        _target: &RenderTargetView<R, T>,
+    ) where
         C: CommandBuffer<R>,
         T: RenderFormat,
     {

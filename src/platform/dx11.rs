@@ -25,18 +25,24 @@ impl FactoryExt<Resources> for Factory {
     }
 }
 
-pub fn launch_dx11<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop, _: ContextBuilder)
-                          -> Result<(Backend,
-                                     DxgiWindow,
-                                     Device,
-                                     Factory,
-                                     RenderTargetView<Resources, C>,
-                                     DepthStencilView<Resources, D>),
-                                    InitError>
-    where C: RenderFormat,
-          D: DepthFormat,
-           <D as Formatted>::Channel: TextureChannel,
-           <D as Formatted>::Surface: TextureSurface,
+pub fn launch_dx11<C, D>(
+    wb: winit::WindowBuilder,
+    el: &winit::EventsLoop,
+    _: ContextBuilder,
+) -> Result<
+    (Backend,
+     DxgiWindow,
+     Device,
+     Factory,
+     RenderTargetView<Resources, C>,
+     DepthStencilView<Resources, D>),
+    InitError,
+>
+where
+    C: RenderFormat,
+    D: DepthFormat,
+    <D as Formatted>::Channel: TextureChannel,
+    <D as Formatted>::Surface: TextureSurface,
 {
     /*
     let (window, device, mut factory, rtv) = init(wb, el)?;

@@ -21,15 +21,15 @@ impl Vertex {
     }
 }
 
-pub fn load_obj(obj_name: &str)
-    -> Result<(Vec<Vertex>, Vec<Index>), LoadObjError>
-{
+pub fn load_obj(obj_name: &str) -> Result<(Vec<Vertex>, Vec<Index>), LoadObjError> {
     use wavefront_obj::obj::Primitive;
     let mut obj_string = String::new();
     {
         let mut obj_file_name = get_assets_folder().map(|p| p.to_path_buf())?;
         obj_file_name.push(&format!("mesh/{}.obj", obj_name));
-        File::open(obj_file_name).and_then(|mut f| f.read_to_string(&mut obj_string))?;
+        File::open(obj_file_name).and_then(|mut f| {
+            f.read_to_string(&mut obj_string)
+        })?;
     }
 
     let obj = obj::parse(obj_string)?;
@@ -59,7 +59,10 @@ pub fn load_obj(obj_name: &str)
                 norms.push(object.normals[n0 as usize]);
                 norms.push(object.normals[n2 as usize]);
             }
-            _ => { println!("{:?}", s);  unimplemented!() }
+            _ => {
+                println!("{:?}", s);
+                unimplemented!()
+            }
         }
     }
 
@@ -101,8 +104,7 @@ impl fmt::Display for LoadObjError {
         match *self {
             LoadObjError::Io(ref e) => write!(fmtr, "{}: {}", self.description(), e),
             LoadObjError::ObjParse(ref e) => write!(fmtr, "{}, {:?}", self.description(), e),
-            LoadObjError::AssetsFolder(ref e) =>
-                write!(fmtr, "{}, {:?}", self.description(), e),
+            LoadObjError::AssetsFolder(ref e) => write!(fmtr, "{}, {:?}", self.description(), e),
             LoadObjError::NoMeshFound => fmtr.pad(self.description()),
         }
     }
@@ -161,18 +163,21 @@ impl PackedObjVertex {
     }
 }
 
-fn build_unified_buffers(vertices: &[obj::Vertex],
-                         tex_coords: &[obj::TVertex],
-                         normals: &[obj::Normal])
-                         -> (Vec<Vertex>, Vec<Index>) {
+fn build_unified_buffers(
+    vertices: &[obj::Vertex],
+    tex_coords: &[obj::TVertex],
+    normals: &[obj::Normal],
+) -> (Vec<Vertex>, Vec<Index>) {
     let mut out_verts = Vec::new();
     let mut out_inds = Vec::new();
     let mut vert_to_out = BTreeMap::new();
 
-    for packed in vertices.iter()
+    for packed in vertices
+        .iter()
         .zip(tex_coords.iter())
         .zip(normals.iter())
-        .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n)) {
+        .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n))
+    {
         match vert_to_out.entry(packed.clone()) {
             Entry::Occupied(e) => out_inds.push(*e.get()),
             Entry::Vacant(e) => {

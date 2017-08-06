@@ -52,7 +52,7 @@ impl FactoryExt<Resources> for MetalFactory {
 #[derive(Debug)]
 pub enum MetalInitError {
     Init(InitError),
-    Dsv(CombinedError)
+    Dsv(CombinedError),
 }
 
 impl fmt::Display for MetalInitError {
@@ -87,18 +87,25 @@ impl From<CombinedError> for MetalInitError {
     }
 }
 
-pub fn launch_metal<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop, _: ContextBuilder)
-                          -> Result<(Backend,
-                                     MetalWindow,
-                                     Device,
-                                     MetalFactory,
-                                     RenderTargetView<Resources, C>,
-                                     DepthStencilView<Resources, D>),
-                                    MetalInitError>
-    where C: RenderFormat,
-          D: DepthFormat,
-           <D as Formatted>::Channel: TextureChannel,
-           <D as Formatted>::Surface: TextureSurface, {
+pub fn launch_metal<C, D>(
+    wb: winit::WindowBuilder,
+    el: &winit::EventsLoop,
+    _: ContextBuilder,
+) -> Result<
+    (Backend,
+     MetalWindow,
+     Device,
+     MetalFactory,
+     RenderTargetView<Resources, C>,
+     DepthStencilView<Resources, D>),
+    MetalInitError,
+>
+where
+    C: RenderFormat,
+    D: DepthFormat,
+    <D as Formatted>::Channel: TextureChannel,
+    <D as Formatted>::Surface: TextureSurface,
+{
     let (window, device, mut factory, rtv) = init(wb, el)?;
     let (w, h) = window.get_inner_size_points().unwrap_or((0, 0));
     let dsv = factory.create_depth_stencil_view_only(w as Size, h as Size)?;

@@ -17,11 +17,14 @@ impl WindowExt<Resources> for GlWindow {
     }
 
     #[inline]
-    fn update_views<C, D>(&self,
-                          rtv: &mut RenderTargetView<Resources, C>,
-                          dsv: &mut DepthStencilView<Resources, D>)
-        where C: RenderFormat,
-              D: DepthFormat {
+    fn update_views<C, D>(
+        &self,
+        rtv: &mut RenderTargetView<Resources, C>,
+        dsv: &mut DepthStencilView<Resources, D>,
+    ) where
+        C: RenderFormat,
+        D: DepthFormat,
+    {
         gfx_window_glutin::update_views(&self, rtv, dsv)
     }
 }
@@ -34,16 +37,23 @@ impl FactoryExt<Resources> for Factory {
     }
 }
 
-pub fn launch_gl<C, D>(wb: winit::WindowBuilder, el: &winit::EventsLoop, cb: ContextBuilder)
-                       -> Result<(Backend,
-                                  GlWindow,
-                                  Device,
-                                  Factory,
-                                  RenderTargetView<Resources, C>,
-                                  DepthStencilView<Resources, D>),
-                                 Void>
-    where C: RenderFormat,
-          D: DepthFormat {
+pub fn launch_gl<C, D>(
+    wb: winit::WindowBuilder,
+    el: &winit::EventsLoop,
+    cb: ContextBuilder,
+) -> Result<
+    (Backend,
+     GlWindow,
+     Device,
+     Factory,
+     RenderTargetView<Resources, C>,
+     DepthStencilView<Resources, D>),
+    Void,
+>
+where
+    C: RenderFormat,
+    D: DepthFormat,
+{
 
     let (w, d, f, rtv, dst) = gfx_window_glutin::init(wb, cb.into(), el);
     Ok((Backend::Gl, w, d, f, rtv, dst))

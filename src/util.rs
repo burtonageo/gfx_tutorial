@@ -46,7 +46,9 @@ impl Error for GetAssetsFolderError {
     }
 }
 
-pub fn open_file_relative_to_assets<P: AsRef<Path>>(relative_path: P) -> Result<File, OpenAssetsFileError> {
+pub fn open_file_relative_to_assets<P: AsRef<Path>>(
+    relative_path: P,
+) -> Result<File, OpenAssetsFileError> {
     let mut path = get_assets_folder()?.to_path_buf();
     path.push(relative_path.as_ref());
     Ok(File::open(&path)?)
@@ -77,7 +79,9 @@ impl fmt::Display for OpenAssetsFileError {
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             OpenAssetsFileError::Io(ref e) => write!(fmtr, "{}: {}", self.description(), e),
-            OpenAssetsFileError::GetAssetsFolder(ref e) => write!(fmtr, "{}: {}", self.description(), e),
+            OpenAssetsFileError::GetAssetsFolder(ref e) => {
+                write!(fmtr, "{}: {}", self.description(), e)
+            }
         }
     }
 }
@@ -87,7 +91,9 @@ impl Error for OpenAssetsFileError {
     fn description(&self) -> &str {
         match *self {
             OpenAssetsFileError::Io(_) => "an IO error occurred",
-            OpenAssetsFileError::GetAssetsFolder(_) => "an error occurred while finding the assets folder",
+            OpenAssetsFileError::GetAssetsFolder(_) => {
+                "an error occurred while finding the assets folder"
+            }
         }
     }
 

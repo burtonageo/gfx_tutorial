@@ -36,7 +36,10 @@ impl ContextBuilder {
 
     #[inline]
     pub fn with_vsync_enabled(self, vsync_enabled: bool) -> Self {
-        ContextBuilder { is_vsync_enabled: vsync_enabled, ..self }
+        ContextBuilder {
+            is_vsync_enabled: vsync_enabled,
+            ..self
+        }
     }
 }
 
@@ -49,9 +52,12 @@ pub trait WindowExt<R: Resources> {
     type SwapBuffersError: Error;
     fn swap_buffers(&self) -> Result<(), Self::SwapBuffersError>;
 
-    fn update_views<C: RenderFormat, D: DepthFormat>(&self,
-                                                     _rtv: &mut RenderTargetView<R, C>,
-                                                     _dsv: &mut DepthStencilView<R, D>) { }
+    fn update_views<C: RenderFormat, D: DepthFormat>(
+        &self,
+        _rtv: &mut RenderTargetView<R, C>,
+        _dsv: &mut DepthStencilView<R, D>,
+    ) {
+    }
 }
 
 pub trait FactoryExt<R: Resources>: Factory<R> {
@@ -71,11 +77,7 @@ pub enum Backend {
 
 impl Backend {
     pub fn is_gl(&self) -> bool {
-        if let Backend::Gl = *self {
-            true
-        } else {
-            false
-        }
+        if let Backend::Gl = *self { true } else { false }
     }
 
     pub fn is_metal(&self) -> bool {
@@ -119,7 +121,7 @@ pub enum ShaderPipeline<'a> {
     Geometry {
         vertex: &'a [u8],
         geometry: &'a [u8],
-        pixel: &'a [u8]
+        pixel: &'a [u8],
     },
     Full {
         vertex: &'a [u8],
@@ -129,4 +131,3 @@ pub enum ShaderPipeline<'a> {
         pixel: &'a [u8],
     },
 }
-
