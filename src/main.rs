@@ -43,14 +43,14 @@ mod util;
 use ang::{Angle, Degrees};
 use gfx::{Bundle, CommandBuffer, Device, Encoder, Factory, Resources};
 use gfx::format::{RenderFormat, Rgba8};
-use gfx::handle::RenderTargetView;
+use gfx::handle::{DepthStencilView, RenderTargetView};
 use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
 use load::load_obj;
-use na::{Isometry3, Perspective3, Point3, PointBase, Rotation3, Vector3};
+use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, Rotation3, Vector3};
 use num::{cast, NumCast, One, Zero};
-use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use platform::{Backend, ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::env::args;
 use std::ops::{Div, Neg};
 use std::time::Duration as StdDuration;
@@ -71,9 +71,9 @@ gfx_defines! {
     }
 
     constant VertLocals {
-        transform: [[f32; 4]; 4] = "mvp_transform",
-        model: [[f32; 4]; 4] = "model_transform",
-        view: [[f32; 4]; 4] = "view_transform",
+        projection: [[f32; 4]; 4] = "projection_matrix",
+        model: [[f32; 4]; 4] = "model_matrix",
+        view: [[f32; 4]; 4] = "view_matrix",
     }
 
     constant SharedLocals {
@@ -91,10 +91,14 @@ gfx_defines! {
         main_texture: gfx::TextureSampler<[f32; 4]> = "color_texture",
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
         camera: gfx::ConstantBuffer<Camera> = "main_camera",
-        out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
-        main_depth: gfx::DepthTarget<gfx::format::DepthStencil> = gfx::preset::depth::LESS_EQUAL_WRITE,
+        out: gfx::RenderTarget<ColorFormat> = "Target0",
+        main_depth: gfx::DepthTarget<DepthFormat> =
+            gfx::preset::depth::LESS_EQUAL_WRITE,
     }
 }
+
+type ColorFormat = gfx::format::Rgba8;
+type DepthFormat = gfx::format::DepthStencil;
 
 const GLSL_VERT_SRC: &'static [u8] = include_bytes!("../data/shader/glsl/standard.vs");
 const GLSL_FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/glsl/standard.fs");
@@ -159,6 +163,96 @@ impl From<Light> for ShaderLight {
 
 const MAX_LIGHTS: usize = 10;
 
+struct Model<R: Resources>(Bundle<R, pipe::Data<R>>);
+
+impl<R: Resources> Model<R> {
+    fn load<F: PlFactoryExt<R>>(
+        factory: &mut F,
+        backend: &Backend,
+        rtv: RenderTargetView<R, ColorFormat>,
+        dsv: DepthStencilView<R, DepthFormat>,
+        model_name: &str,
+        texture_name: &str
+    ) -> Result<Self, load::LoadObjError>
+    {
+        let program = if backend.is_gl() {
+            factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
+        } else {
+            factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
+        };
+
+        let pso = factory.create_pipeline_from_program(&program,
+                                        gfx::Primitive::TriangleList,
+                                        gfx::state::Rasterizer::new_fill().with_cull_back(),
+                                        pipe::new())
+            .expect("Could not create pso");
+
+        let (_, srv) = {
+            let mut img_path = get_assets_folder().unwrap().to_path_buf();
+            img_path.push(texture_name);
+            let img = image::open(img_path).expect("Could not open image").to_rgba();
+            let (iw, ih) = img.dimensions();
+            let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
+            factory.create_texture_immutable_u8::<Rgba8>(kind, &[&img])
+                .expect("Could not create texture")
+        };
+
+        let sampler = factory.create_sampler_linear();
+
+        let (verts, inds) = load_obj(model_name).expect("Could not load obj file");
+        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
+        let data = pipe::Data {
+            vbuf: vertex_buffer,
+            vert_locals: factory.create_constant_buffer(1),
+            shared_locals: factory.create_constant_buffer(1),
+            lights: factory.create_constant_buffer(MAX_LIGHTS),
+            camera: factory.create_constant_buffer(1),
+            main_texture: (srv, sampler),
+            out: rtv,
+            main_depth: dsv,
+        };
+
+        Ok(Model(Bundle::new(slice, pso, data)))
+    }
+
+    #[inline]
+    fn encode<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>) {
+        self.0.encode(encoder)
+    }
+
+    #[inline]
+    fn update_matrices<C: CommandBuffer<R>>(
+        &self,
+        encoder: &mut Encoder<R, C>,
+        model_matrix: &Matrix4<f32>,
+        view_matrix: &Matrix4<f32>,
+        projection_matrix: &Matrix4<f32>,
+    ) {
+        encoder.update_constant_buffer(&self.0.data.vert_locals,
+                                       &VertLocals {
+                                           model: *(model_matrix).as_ref(),
+                                           view: *(view_matrix).as_ref(),
+                                           projection: *(projection_matrix).as_ref(),
+                                       });
+    }
+
+    #[inline]
+    fn update_lights<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>, lights: &[ShaderLight]) {
+        let num_lights = lights.len() as u32;
+        encoder.update_constant_buffer(&self.0.data.shared_locals, &SharedLocals { num_lights });
+        encoder.update_buffer(&self.0.data.lights, &lights, 0).expect("Could not update buffer");
+    }
+
+    #[inline]
+    fn update_camera<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>, camera: &Camera) {
+        encoder.update_constant_buffer(&self.0.data.camera, &camera);
+    }
+
+    fn update_views<W: PlatformWindow<R>>(&mut self, window: &W) {
+        window.update_views(&mut self.0.data.out, &mut self.0.data.main_depth);
+    }
+}
+
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
     let (win_w, win_h) = winit::get_primary_monitor().get_dimensions();
@@ -178,45 +272,15 @@ fn main() {
     window.center_cursor().expect("Could not set cursor position");
 
     let mut encoder = factory.create_encoder();
-    let program = if backend.is_gl() {
-        factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
-    } else {
-        factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
-    };
-
-    let pso = factory.create_pipeline_from_program(&program,
-                                      gfx::Primitive::TriangleList,
-                                      gfx::state::Rasterizer::new_fill().with_cull_back(),
-                                      pipe::new())
-        .expect("Could not create pso");
-
-    let (_, srv) = {
-        let mut img_path = get_assets_folder().unwrap().to_path_buf();
-        img_path.push("img/checker.png");
-        let img = image::open(img_path).expect("Could not open image").to_rgba();
-        let (iw, ih) = img.dimensions();
-        let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
-        factory.create_texture_immutable_u8::<Rgba8>(kind, &[&img])
-            .expect("Could not create texture")
-    };
-
-    let sampler = factory.create_sampler_linear();
-
-    let (verts, inds) = load_obj(&args().nth(1).unwrap_or("suzanne".into())).expect("Could not load obj file");
-    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
-    let data = pipe::Data {
-        vbuf: vertex_buffer,
-        vert_locals: factory.create_constant_buffer(1),
-        shared_locals: factory.create_constant_buffer(1),
-        lights: factory.create_constant_buffer(MAX_LIGHTS),
-        camera: factory.create_constant_buffer(1),
-        main_texture: (srv, sampler),
-        out: main_color,
-        main_depth: main_depth,
-    };
+    let mut model = Model::load(
+        &mut factory,
+        &backend,
+        main_color.clone(),
+        main_depth.clone(),
+        &args().nth(1).unwrap_or("suzanne".into()),
+        "img/checker.png").expect("Could not load model");
 
     let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
-    let mut bundle = Bundle::new(slice, pso, data);
 
     let mut rot = Rotation3::identity();
     let mut iput = Input::new();
@@ -258,7 +322,7 @@ fn main() {
             let (w, h) = window.windowext_get_inner_size();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
+                    model.update_views(&window);
                     projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
@@ -277,7 +341,7 @@ fn main() {
                         }
                         #[cfg(not(target_os = "macos"))]
                         WindowEvent::Resized(..) => {
-                            window.update_views(&mut bundle.data.out, &mut bundle.data.main_depth);
+                            model.update_views(&window);
                             projection.set_aspect(window.aspect());
                         }
                         WindowEvent::MouseMoved { position: (x, y), .. } => {
@@ -344,12 +408,15 @@ fn main() {
                                   &up)
         };
 
-        encoder.clear(&bundle.data.out, CLEAR_COLOR);
-        encoder.clear_depth(&bundle.data.main_depth, 1.0);
+        encoder.clear(&main_color, CLEAR_COLOR);
+        encoder.clear_depth(&main_depth, 1.0);
 
         let view_mat = view.to_homogeneous();
         let model_mat = rot.to_homogeneous();
-        let mvp = projection.to_homogeneous() * view_mat * model_mat;
+        let projection_mat = projection.to_homogeneous();
+
+        model.update_matrices(&mut encoder, &model_mat, &view_mat, &projection_mat);
+
         let l0 = Light {
             position: Point3::new(0.0, 0.0, 3.0),
             color: [0.1, 0.1, 1.0, 1.0],
@@ -366,20 +433,12 @@ fn main() {
             power: 80.0,
         };
         let lights: [ShaderLight; 3] = [l0.into(), l1.into(), l2.into()];
-        encoder.update_constant_buffer(&bundle.data.vert_locals,
-                                       &VertLocals {
-                                           transform: *(mvp).as_ref(),
-                                           model: *(model_mat).as_ref(),
-                                           view: *(view_mat).as_ref(),
-                                       });
+        model.update_lights(&mut encoder, &lights);
         let cam_pos = [iput.position.x, iput.position.y, iput.position.z, 1.0];
-        encoder.update_constant_buffer(&bundle.data.shared_locals,
-                                       &SharedLocals { num_lights: lights.len() as u32 });
-        encoder.update_constant_buffer(&bundle.data.camera, &Camera { position: cam_pos });
-        encoder.update_buffer(&bundle.data.lights, &lights, 0).expect("Could not update buffer");
+        model.update_camera(&mut encoder, &Camera { position: cam_pos });
 
-        bundle.encode(&mut encoder);
-        fps.render(dt_s, &mut encoder, &bundle.data.out);
+        model.encode(&mut encoder);
+        fps.render(dt_s, &mut encoder, &main_color);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
@@ -387,7 +446,7 @@ fn main() {
 }
 
 trait WindowExt {
-   fn center_cursor(&self) -> Result<(), ()>;
+    fn center_cursor(&self) -> Result<(), ()>;
     fn hide_and_grab_cursor(&self) -> Result<(), String>;
     fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N);
     fn aspect<N: Default + Div<Output=N> + NumCast + Zero + One>(&self) -> N {
