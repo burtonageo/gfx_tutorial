@@ -2,7 +2,7 @@
 name = "gfx_tutorial"
 version = "0.1.0"
 dependencies = [
- "alga 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "alga 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ang 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "find_folder 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gfx 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -33,7 +33,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "alga"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -689,7 +689,7 @@ name = "nalgebra"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "alga 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "alga 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "generic-array 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-complex 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1264,7 +1264,7 @@ dependencies = [
 
 [metadata]
 "checksum adler32 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ce93f29e3642662cac79d45e9c27ead906b91ac9921c1cf6f4801d01b4e19a8b"
-"checksum alga 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ac1e4aec8a55e9150c6941e3c1059272b8e607c0503f9b61ca12289e56efb87b"
+"checksum alga 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9a9749cf5cfdca30ac35de67358fb24e2d26a88e2819ee83efb794a09f0b421b"
 "checksum android_glue 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
 "checksum ang 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5aacfb455c4709edef7982d4cd2f7ea7805e206f8b3de45823a6a6fca158c43"
 "checksum approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "08abcc3b4e9339e33a3d0a5ed15d84a687350c05689d825e0f6655eef9e76a94"
