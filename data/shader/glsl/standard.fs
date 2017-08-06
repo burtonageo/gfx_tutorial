@@ -5,6 +5,7 @@ const int MAX_LIGHTS = 10;
 in vec2 v_tex_coord;
 in vec3 frag_position_world;
 in vec3 normal_camera;
+in mat4 model_view_matrix;
 
 out vec4 Target0;
 
@@ -16,10 +17,6 @@ struct Light {
     float power;
 };
 
-layout (std140) uniform main_camera {
-    vec4 cam_position;
-};
-
 layout (std140) uniform shared_locals {
     uint num_lights;
 };
@@ -28,8 +25,14 @@ layout (std140) uniform lights_array {
     Light lights[MAX_LIGHTS];
 };
 
+vec4 extract_camera_position(mat4 model_view) {
+    mat4 view_model = inverse(model_view);
+    return view_model[3];
+}
+
 void main() {
     vec4 total_lighting = vec4(0.0, 0.0, 0.0, 0.0);
+    vec4 cam_position = extract_camera_position(model_view_matrix);
 
     for (uint i = uint(0); i < min(num_lights, MAX_LIGHTS); i++) {
         vec3 light_position = lights[i].position;

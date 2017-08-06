@@ -48,7 +48,8 @@ use gfx::texture::{AaMode, Kind};
 use gfx::traits::FactoryExt;
 use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
 use load::load_obj;
-use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, Rotation3, Vector3};
+use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, Rotation3, Similarity3,
+         UnitQuaternion, Vector3};
 use num::{cast, NumCast, One, Zero};
 use platform::{Backend, ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::env::args;
@@ -80,17 +81,12 @@ gfx_defines! {
         num_lights: u32 = "num_lights",
     }
 
-    constant Camera {
-        position: [f32; 4] = "cam_position",
-    }
-
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         vert_locals: gfx::ConstantBuffer<VertLocals> = "vert_locals",
         shared_locals: gfx::ConstantBuffer<SharedLocals> = "shared_locals",
         main_texture: gfx::TextureSampler<[f32; 4]> = "color_texture",
         lights: gfx::ConstantBuffer<ShaderLight> = "lights_array",
-        camera: gfx::ConstantBuffer<Camera> = "main_camera",
         out: gfx::RenderTarget<ColorFormat> = "Target0",
         main_depth: gfx::DepthTarget<DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
@@ -163,7 +159,10 @@ impl From<Light> for ShaderLight {
 
 const MAX_LIGHTS: usize = 10;
 
-struct Model<R: Resources>(Bundle<R, pipe::Data<R>>);
+struct Model<R: Resources> {
+    bundle: Bundle<R, pipe::Data<R>>,
+    pub similarity: Similarity3<f32>,
+}
 
 impl<R: Resources> Model<R> {
     fn load<F: PlFactoryExt<R>>(
@@ -211,30 +210,31 @@ impl<R: Resources> Model<R> {
             vert_locals: factory.create_constant_buffer(1),
             shared_locals: factory.create_constant_buffer(1),
             lights: factory.create_constant_buffer(MAX_LIGHTS),
-            camera: factory.create_constant_buffer(1),
             main_texture: (srv, sampler),
             out: rtv,
             main_depth: dsv,
         };
-
-        Ok(Model(Bundle::new(slice, pso, data)))
+        
+        let bundle = Bundle::new(slice, pso, data);
+        let similarity = Similarity3::from_scaling(1.0);
+        Ok(Model { bundle, similarity })
     }
 
     #[inline]
     fn encode<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>) {
-        self.0.encode(encoder)
+        self.bundle.encode(encoder)
     }
 
     #[inline]
     fn update_matrices<C: CommandBuffer<R>>(
         &self,
         encoder: &mut Encoder<R, C>,
-        model_matrix: &Matrix4<f32>,
         view_matrix: &Matrix4<f32>,
         projection_matrix: &Matrix4<f32>,
     ) {
+        let model_matrix = self.similarity.to_homogeneous();
         encoder.update_constant_buffer(
-            &self.0.data.vert_locals,
+            &self.bundle.data.vert_locals,
             &VertLocals {
                 model: *(model_matrix).as_ref(),
                 view: *(view_matrix).as_ref(),
@@ -250,19 +250,16 @@ impl<R: Resources> Model<R> {
         lights: &[ShaderLight],
     ) {
         let num_lights = lights.len() as u32;
-        encoder.update_constant_buffer(&self.0.data.shared_locals, &SharedLocals { num_lights });
+        assert!(num_lights < MAX_LIGHTS as u32);
+        encoder.update_constant_buffer(&self.bundle.data.shared_locals, &SharedLocals { num_lights });
         encoder
-            .update_buffer(&self.0.data.lights, &lights, 0)
+            .update_buffer(&self.bundle.data.lights, &lights, 0)
             .expect("Could not update buffer");
     }
 
     #[inline]
-    fn update_camera<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>, camera: &Camera) {
-        encoder.update_constant_buffer(&self.0.data.camera, &camera);
-    }
-
     fn update_views<W: PlatformWindow<R>>(&mut self, window: &W) {
-        window.update_views(&mut self.0.data.out, &mut self.0.data.main_depth);
+        window.update_views(&mut self.bundle.data.out, &mut self.bundle.data.main_depth);
     }
 }
 
@@ -288,7 +285,7 @@ fn main() {
     );
 
     let mut encoder = factory.create_encoder();
-    let mut model = Model::load(
+    let monkey_model = Model::load(
         &mut factory,
         &backend,
         main_color.clone(),
@@ -297,9 +294,20 @@ fn main() {
         "img/checker.png",
     ).expect("Could not load model");
 
+    let cube_model = Model::load(
+        &mut factory,
+        &backend,
+        main_color.clone(),
+        main_depth.clone(),
+        &args().nth(1).unwrap_or("cube".into()),
+        "img/checker.png",
+    ).expect("Could not load model");
+
+    let mut scene = vec![monkey_model, cube_model];
+    scene[1].similarity.isometry.translation.vector[1] -= 4.0f32;
+
     let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
 
-    let mut rot = Rotation3::identity();
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
@@ -343,7 +351,9 @@ fn main() {
             let (w, h) = window.windowext_get_inner_size();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    model.update_views(&window);
+                    for model in &mut scene {
+                        model.update_views(&window);
+                    }
                     projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
@@ -362,7 +372,9 @@ fn main() {
                         }
                         #[cfg(not(target_os = "macos"))]
                         WindowEvent::Resized(..) => {
-                            model.update_views(&window);
+                            for model in &mut scene {
+                                model.update_views(&window);
+                            }
                             projection.set_aspect(window.aspect());
                         }
                         WindowEvent::MouseMoved { position: (x, y), .. } => {
@@ -420,7 +432,10 @@ fn main() {
             continue;
         }
 
-        rot *= Rotation3::new(Vector3::new(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0));
+        let rot_quat = UnitQuaternion::from_euler_angles(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0);
+        for model in &mut scene {
+            model.similarity.append_rotation_mut(&rot_quat);
+        }
 
         let view = {
             let up = right.cross(&direction);
@@ -435,10 +450,7 @@ fn main() {
         encoder.clear_depth(&main_depth, 1.0);
 
         let view_mat = view.to_homogeneous();
-        let model_mat = rot.to_homogeneous();
         let projection_mat = projection.to_homogeneous();
-
-        model.update_matrices(&mut encoder, &model_mat, &view_mat, &projection_mat);
 
         let l0 = Light {
             position: Point3::new(0.0, 0.0, 3.0),
@@ -456,11 +468,13 @@ fn main() {
             power: 80.0,
         };
         let lights: [ShaderLight; 3] = [l0.into(), l1.into(), l2.into()];
-        model.update_lights(&mut encoder, &lights);
-        let cam_pos = [iput.position.x, iput.position.y, iput.position.z, 1.0];
-        model.update_camera(&mut encoder, &Camera { position: cam_pos });
 
-        model.encode(&mut encoder);
+        for model in &scene {
+            model.update_matrices(&mut encoder, &view_mat, &projection_mat);
+            model.update_lights(&mut encoder, &lights);
+            model.encode(&mut encoder);
+        }
+
         fps.render(dt_s, &mut encoder, &main_color);
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
