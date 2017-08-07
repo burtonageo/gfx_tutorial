@@ -1,12 +1,15 @@
-use {pipe, ColorFormat, DepthFormat, GLSL_VERT_SRC, GLSL_FRAG_SRC, MAX_LIGHTS,
-     MSL_VERT_SRC, MSL_FRAG_SRC, ShaderLight, SharedLocals, VertLocals};
-use gfx::{Bundle, CommandBuffer, Encoder, Primitive, Resources};
+use {pipe, ColorFormat, DepthFormat, GLSL_VERT_SRC, GLSL_FRAG_SRC, MAX_LIGHTS, MSL_VERT_SRC,
+     MSL_FRAG_SRC, ShaderLight, SharedLocals, VertLocals};
+use gfx::{Bundle, CombinedError, CommandBuffer, Encoder, PipelineStateError, Primitive, Resources,
+          UpdateError};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use gfx::state::Rasterizer;
 use gfx::texture::{AaMode, Kind};
-use image;
+use image::{self, ImageError};
 use load::{load_obj, LoadObjError};
 use na::{Matrix4, Similarity3};
+use std::error::Error;
+use std::fmt;
 use platform::{Backend, FactoryExt, WindowExt};
 use util::get_assets_folder;
 
@@ -23,38 +26,35 @@ impl<R: Resources> Model<R> {
         dsv: DepthStencilView<R, DepthFormat>,
         model_name: &str,
         texture_name: &str,
-    ) -> Result<Self, LoadObjError> {
+    ) -> Result<Self, ModelLoadError> {
         let program = if backend.is_gl() {
             factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
         } else {
             factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
         };
 
-        let pso = factory
-            .create_pipeline_from_program(
-                &program,
-                Primitive::TriangleList,
-                Rasterizer::new_fill().with_cull_back(),
-                pipe::new(),
-            )
-            .expect("Could not create pso");
+        let pso = factory.create_pipeline_from_program(
+            &program,
+            Primitive::TriangleList,
+            Rasterizer::new_fill().with_cull_back(),
+            pipe::new(),
+        )?;
 
         let (_, srv) = {
             let mut img_path = get_assets_folder().unwrap().to_path_buf();
             img_path.push(texture_name);
-            let img = image::open(img_path)
-                .expect("Could not open image")
-                .to_rgba();
+            let img = image::open(img_path)?.to_rgba();
             let (iw, ih) = img.dimensions();
             let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
-            factory
-                .create_texture_immutable_u8::<ColorFormat>(kind, &[&img])
-                .expect("Could not create texture")
+            factory.create_texture_immutable_u8::<ColorFormat>(
+                kind,
+                &[&img],
+            )?
         };
 
         let sampler = factory.create_sampler_linear();
 
-        let (verts, inds) = load_obj(model_name).expect("Could not load obj file");
+        let (verts, inds) = load_obj(model_name)?;
         let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
         let data = pipe::Data {
             vbuf: vertex_buffer,
@@ -65,7 +65,7 @@ impl<R: Resources> Model<R> {
             out: rtv,
             main_depth: dsv,
         };
-        
+
         let bundle = Bundle::new(slice, pso, data);
         let similarity = Similarity3::from_scaling(1.0);
         Ok(Model { bundle, similarity })
@@ -99,17 +99,98 @@ impl<R: Resources> Model<R> {
         &self,
         encoder: &mut Encoder<R, C>,
         lights: &[ShaderLight],
-    ) {
+    ) -> Result<(), UpdateError<usize>> {
         let num_lights = lights.len() as u32;
         assert!(num_lights < MAX_LIGHTS as u32);
-        encoder.update_constant_buffer(&self.bundle.data.shared_locals, &SharedLocals { num_lights });
-        encoder
-            .update_buffer(&self.bundle.data.lights, &lights, 0)
-            .expect("Could not update buffer");
+        encoder.update_constant_buffer(
+            &self.bundle.data.shared_locals,
+            &SharedLocals { num_lights },
+        );
+        encoder.update_buffer(&self.bundle.data.lights, &lights, 0)
     }
 
     #[inline]
     pub fn update_views<W: WindowExt<R>>(&mut self, window: &W) {
         window.update_views(&mut self.bundle.data.out, &mut self.bundle.data.main_depth);
+    }
+}
+
+#[derive(Debug)]
+pub enum ModelLoadError {
+    Obj(LoadObjError),
+    Pso(PipelineStateError<String>),
+    GfxTextureView(CombinedError),
+    Image(ImageError),
+}
+
+impl fmt::Display for ModelLoadError {
+    #[inline]
+    fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
+        let desc = self.description();
+        match *self {
+            ModelLoadError::Obj(ref e) => write!(fmtr, "{}: {}", desc, e),
+            ModelLoadError::Pso(ref e) => write!(fmtr, "{}: {}", desc, e),
+            ModelLoadError::GfxTextureView(ref e) => write!(fmtr, "{}: {}", desc, e),
+            ModelLoadError::Image(ref e) => write!(fmtr, "{}: {}", desc, e),
+        }
+    }
+}
+
+impl Error for ModelLoadError {
+    fn description(&self) -> &str {
+        match *self {
+            ModelLoadError::Obj(_) => "The obj file could not be loaded",
+            ModelLoadError::Pso(_) => "There was an error creating the pso",
+            ModelLoadError::GfxTextureView(_) => {
+                "An error occured while loading the texture on the gpu"
+            }
+            ModelLoadError::Image(_) => {
+                "An error occurred while loading the texture image from disk"
+            }
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        match *self {
+            ModelLoadError::Obj(ref e) => Some(e),
+            ModelLoadError::Pso(ref e) => Some(e),
+            ModelLoadError::GfxTextureView(ref e) => Some(e),
+            ModelLoadError::Image(ref e) => Some(e),
+        }
+    }
+}
+
+impl From<LoadObjError> for ModelLoadError {
+    #[inline]
+    fn from(e: LoadObjError) -> Self {
+        ModelLoadError::Obj(e)
+    }
+}
+
+impl From<PipelineStateError<String>> for ModelLoadError {
+    #[inline]
+    fn from(e: PipelineStateError<String>) -> Self {
+        ModelLoadError::Pso(e)
+    }
+}
+
+impl<'a> From<PipelineStateError<&'a str>> for ModelLoadError {
+    #[inline]
+    fn from(e: PipelineStateError<&'a str>) -> Self {
+        ModelLoadError::Pso(e.into())
+    }
+}
+
+impl From<CombinedError> for ModelLoadError {
+    #[inline]
+    fn from(e: CombinedError) -> Self {
+        ModelLoadError::GfxTextureView(e)
+    }
+}
+
+impl From<ImageError> for ModelLoadError {
+    #[inline]
+    fn from(e: ImageError) -> Self {
+        ModelLoadError::Image(e)
     }
 }

@@ -44,7 +44,7 @@ mod util;
 use ang::{Angle, Degrees};
 use gfx::{CommandBuffer, Device, Encoder, Factory, Resources};
 use gfx::format::{RenderFormat, Rgba8};
-use gfx::handle::{RenderTargetView};
+use gfx::handle::RenderTargetView;
 use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
 use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, UnitQuaternion, Vector3};
@@ -132,7 +132,10 @@ struct Camera {
 impl Camera {
     #[inline]
     fn matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
-        (self.perspective.to_homogeneous(), self.view.to_homogeneous())
+        (
+            self.perspective.to_homogeneous(),
+            self.view.to_homogeneous(),
+        )
     }
 }
 
@@ -173,10 +176,14 @@ const MAX_LIGHTS: usize = 10;
 
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
-    let (win_w, win_h) = winit::get_primary_monitor().get_dimensions();
-    let builder = winit::WindowBuilder::new()
-        .with_dimensions(win_w, win_h)
-        .with_title("Gfx Example");
+    let builder = {
+        let primary_monitor = winit::get_primary_monitor();
+        let (win_w, win_h) = primary_monitor.get_dimensions();
+        winit::WindowBuilder::new()
+            .with_dimensions(win_w, win_h)
+            // .with_fullscreen(primary_monitor)
+            .with_title("Gfx Example")
+    };
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
         platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(
@@ -340,7 +347,8 @@ fn main() {
             continue;
         }
 
-        let rot_quat = UnitQuaternion::from_euler_angles(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0);
+        let rot_quat =
+            UnitQuaternion::from_euler_angles(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0);
         for model in &mut scene {
             model.similarity.append_rotation_mut(&rot_quat);
         }
@@ -379,7 +387,9 @@ fn main() {
 
         for model in &scene {
             model.update_matrices(&mut encoder, &view_mat, &projection_mat);
-            model.update_lights(&mut encoder, &lights);
+            model.update_lights(&mut encoder, &lights).expect(
+                "Could not update lights",
+            );
             model.encode(&mut encoder);
         }
 
