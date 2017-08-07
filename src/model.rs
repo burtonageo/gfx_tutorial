@@ -137,6 +137,7 @@ impl fmt::Display for ModelLoadError {
 }
 
 impl Error for ModelLoadError {
+    #[inline]
     fn description(&self) -> &str {
         match *self {
             ModelLoadError::Obj(_) => "The obj file could not be loaded",
@@ -150,6 +151,7 @@ impl Error for ModelLoadError {
         }
     }
 
+    #[inline]
     fn cause(&self) -> Option<&Error> {
         match *self {
             ModelLoadError::Obj(ref e) => Some(e),
