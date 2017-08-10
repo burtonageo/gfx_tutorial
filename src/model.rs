@@ -27,47 +27,50 @@ impl<R: Resources> Model<R> {
         model_name: &str,
         texture_name: &str,
     ) -> Result<Self, ModelLoadError> {
-        let program = if backend.is_gl() {
-            factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
-        } else {
-            factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
-        };
-
-        let pso = factory.create_pipeline_from_program(
-            &program,
-            Primitive::TriangleList,
-            Rasterizer::new_fill().with_cull_back(),
-            pipe::new(),
-        )?;
-
-        let (_, srv) = {
-            let mut img_path = get_assets_folder().unwrap().to_path_buf();
-            img_path.push(texture_name);
-            let img = image::open(img_path)?.to_rgba();
-            let (iw, ih) = img.dimensions();
-            let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
-            factory.create_texture_immutable_u8::<ColorFormat>(
-                kind,
-                &[&img],
-            )?
-        };
-
-        let sampler = factory.create_sampler_linear();
-
-        let (verts, inds) = load_obj(model_name)?;
-        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
-        let data = pipe::Data {
-            vbuf: vertex_buffer,
-            vert_locals: factory.create_constant_buffer(1),
-            shared_locals: factory.create_constant_buffer(1),
-            lights: factory.create_constant_buffer(MAX_LIGHTS),
-            main_texture: (srv, sampler),
-            out: rtv,
-            main_depth: dsv,
-        };
-
-        let bundle = Bundle::new(slice, pso, data);
         let similarity = Similarity3::from_scaling(1.0);
+        let bundle = {
+            let program = if backend.is_gl() {
+                factory.link_program(GLSL_VERT_SRC, GLSL_FRAG_SRC).unwrap()
+            } else {
+                factory.link_program(MSL_VERT_SRC, MSL_FRAG_SRC).unwrap()
+            };
+
+            let pso = factory.create_pipeline_from_program(
+                &program,
+                Primitive::TriangleList,
+                Rasterizer::new_fill().with_cull_back(),
+                pipe::new(),
+            )?;
+
+            let (_, srv) = {
+                let mut img_path = get_assets_folder().unwrap().to_path_buf();
+                img_path.push(texture_name);
+                let img = image::open(img_path)?.to_rgba();
+                let (iw, ih) = img.dimensions();
+                let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
+                factory.create_texture_immutable_u8::<ColorFormat>(
+                    kind,
+                    &[&img],
+                )?
+            };
+
+            let sampler = factory.create_sampler_linear();
+
+            let (verts, inds) = load_obj(model_name)?;
+            let (vertex_buffer, slice) =
+                factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
+            let data = pipe::Data {
+                vbuf: vertex_buffer,
+                vert_locals: factory.create_constant_buffer(1),
+                shared_locals: factory.create_constant_buffer(1),
+                lights: factory.create_constant_buffer(MAX_LIGHTS),
+                main_texture: (srv, sampler),
+                out: rtv,
+                main_depth: dsv,
+            };
+
+            Bundle::new(slice, pso, data)
+        };
         Ok(Model { bundle, similarity })
     }
 
