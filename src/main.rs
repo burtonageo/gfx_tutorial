@@ -139,7 +139,7 @@ impl Camera {
     }
 }
 
-const SPEED: f32 = 4.0;
+const SPEED: f32 = 7.0;
 const MOUSE_SPEED: f32 = 7.0;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -147,6 +147,17 @@ struct Light {
     position: Point3<f32>,
     color: [f32; 4],
     power: f32,
+}
+
+impl Light {
+    #[inline]
+    fn new(position: Point3<f32>, color: [f32; 4], power: f32) -> Self {
+        Light {
+            position,
+            color,
+            power,
+        }
+    }
 }
 
 impl Default for Light {
@@ -219,7 +230,22 @@ fn main() {
     ).expect("Could not load model");
 
     let mut scene = vec![monkey_model, cube_model];
-    scene[1].similarity.isometry.translation.vector[1] -= 4.0f32;
+    scene[0].similarity.isometry.translation.vector[1] += 2.0f32;
+    scene[1].similarity.isometry.translation.vector[1] -= 2.0f32;
+
+    let lights: Vec<ShaderLight> = {
+        let l0 = Light::new(Point3::new(0.0, 0.0, 3.0), [0.1, 0.1, 1.0, 1.0], 200.0);
+        let l1 = Light::new(Point3::new(0.0, 0.0, -2.0), [1.0, 0.0, 0.0, 1.0], 300.0);
+        let l2 = Light::new(Point3::new(-3.0, 1.0, 0.0), [0.0, 1.0, 0.0, 1.0], 80.0);
+        let l3 = Light::new(Point3::new(1.5, -3.0, 0.0), [1.0, 1.0, 0.0, 0.3], 80.0);
+        let l4 = Light::new(Point3::new(3.0, 0.0, 1.0), [0.0, 1.0, 1.0, 0.2], 80.0);
+        let l5 = Light::new(Point3::new(0.0, 5.0, 0.0), [1.0, 0.0, 1.0, 1.0], 80.0);
+
+        vec![l0, l1, l2, l3, l4, l5]
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    };
 
     let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
 
@@ -347,10 +373,9 @@ fn main() {
             continue;
         }
 
-        let rot_quat =
-            UnitQuaternion::from_euler_angles(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0);
+        let rot = UnitQuaternion::from_euler_angles(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0);
         for model in &mut scene {
-            model.similarity.append_rotation_mut(&rot_quat);
+            model.similarity.append_rotation_mut(&rot);
         }
 
         let view = {
@@ -367,23 +392,6 @@ fn main() {
 
         let view_mat = view.to_homogeneous();
         let projection_mat = projection.to_homogeneous();
-
-        let l0 = Light {
-            position: Point3::new(0.0, 0.0, 3.0),
-            color: [0.1, 0.1, 1.0, 1.0],
-            power: 200.0,
-        };
-        let l1 = Light {
-            position: Point3::new(0.0, 0.0, -2.0),
-            color: [1.0, 0.0, 0.0, 1.0],
-            power: 300.0,
-        };
-        let l2 = Light {
-            position: Point3::new(-3.0, 1.0, 0.0),
-            color: [0.0, 1.0, 0.0, 1.0],
-            power: 80.0,
-        };
-        let lights: [ShaderLight; 3] = [l0.into(), l1.into(), l2.into()];
 
         for model in &scene {
             model.update_matrices(&mut encoder, &view_mat, &projection_mat);
