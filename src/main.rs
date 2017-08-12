@@ -273,17 +273,12 @@ fn main() {
         };
 
         let lights: Vec<ShaderLight> = {
-            let l0 = Light::new(Point3::new(0.0, 0.0, 3.0), [0.1, 0.1, 1.0, 1.0], 20.0);
-            let l1 = Light::new(Point3::new(0.0, 0.0, -2.0), [1.0, 0.0, 0.0, 1.0], 10.0);
-            let l2 = Light::new(Point3::new(0.0, 2.2, 0.0), [0.0, 1.0, 0.0, 1.0], 1600.0);
-            let l3 = Light::new(Point3::new(1.5, -3.0, 0.0), [1.0, 1.0, 0.0, 0.3], 20.0);
-            let l4 = Light::new(Point3::new(3.0, 0.0, 1.0), [0.0, 1.0, 1.0, 0.2], 30.0);
-            let l5 = Light::new(Point3::new(0.0, -1.8, 0.0), [1.0, 0.0, 1.0, 1.0], 1600.0);
+            let l1 = Light::new(Point3::new(0.0, 3.0, -2.0), [1.0, 0.0, 0.0, 1.0], 300.0);
+            let l2 = Light::new(Point3::new(0.0, 1.6, 0.0), [1.0, 0.0, 0.0, 1.0], 400.0);
+            let l3 = Light::new(Point3::new(1.5, -3.0, 0.0), [1.0, 0.0, 1.0, 0.3], 300.0);
+            let l4 = Light::new(Point3::new(0.0, -1.8, 0.0), [1.0, 0.0, 1.0, 1.0], 400.0);
 
-            vec![l0, l1, l2, l3, l4, l5]
-                .into_iter()
-                .map(Into::into)
-                .collect()
+            vec![l1, l2, l3, l4].into_iter().map(Into::into).collect()
         };
 
         Scene::new(lights, models)
@@ -456,7 +451,9 @@ fn main() {
         scene
             .render(&mut encoder, view_mat, projection_mat)
             .expect("Could not render scene");
-        fps.render(&mut encoder).expect("Could not render fps counter");
+        fps.render(&mut encoder).expect(
+            "Could not render fps counter",
+        );
 
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
@@ -557,6 +554,7 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
 }
 
 #[cfg(windows)]
+#[derive(Debug)]
 struct FpsRenderer<R: Resources> {
     pub show_fps: bool,
     text_renderer: TextRenderer<R>,
@@ -578,19 +576,14 @@ impl<R: Resources> FpsRenderer<R> {
     }
 
     #[inline]
-    fn render<C: CommandBuffer<R>>(
-        &mut self,
-        encoder: &mut Encoder<R, C>,
-    ) -> TextResult<()> {
+    fn render<C: CommandBuffer<R>>(&mut self, encoder: &mut Encoder<R, C>) -> TextResult<()> {
         if self.show_fps {
             let text = StyledText::new(
                 "Hello",
                 Color::new(1.0, 0.0, 1.0, 1.0),
                 FontScale::uniform(16.0),
-                FontPoint {
-                    x: 900.0,
-                    y: 25.0,
-                });
+                FontPoint { x: 900.0, y: 25.0 },
+            );
             self.text_renderer.add_text(&text, encoder)?;
             self.text_renderer.encode(encoder);
         }
