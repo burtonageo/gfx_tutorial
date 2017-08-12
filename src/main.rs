@@ -44,14 +44,16 @@ mod util;
 
 use ang::{Angle, Degrees};
 use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
-use gfx::format::{RenderFormat, Rgba8};
+use gfx::format::Rgba8;
 use gfx::handle::RenderTargetView;
-use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
+use gfx_rusttype::{Color, read_fonts, TextRenderer, TextResult, StyledText};
 use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, UnitQuaternion, Vector3};
 use num::{cast, NumCast, One, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use rusttype::{FontCollection, Point as FontPoint, Scale as FontScale};
 use std::ops::{Div, Neg};
+use std::path::{Path, PathBuf};
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
 
@@ -287,14 +289,36 @@ fn main() {
         Scene::new(lights, models)
     };
 
-    let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
+    let fonts = {
+        let owned_font_paths = vec![
+            "NotoSans-Bold.ttf",
+            "NotoSans-BoldItalic.ttf",
+            "NotoSans-Italic.ttf",
+            "NotoSans-Regular.ttf",
+        ].into_iter()
+            .map(|p| {
+                util::get_assets_folder()
+                    .unwrap()
+                    .to_path_buf()
+                    .join("fonts")
+                    .join("noto_sans")
+                    .join(p)
+            })
+            .collect::<Vec<PathBuf>>();
+        let mut borrowed_font_paths = Vec::with_capacity(owned_font_paths.len());
+        for fp in &owned_font_paths {
+            borrowed_font_paths.push(fp as &Path);
+        }
+        read_fonts(&borrowed_font_paths).expect("Could not create fonts")
+    };
+    let mut fps = FpsRenderer::new(&mut factory, main_color.clone(), fonts)
+        .expect("Could not create text renderer");
 
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
 
-    let mut show_fps = false;
     let mut is_running = true;
 
     while is_running {
@@ -390,7 +414,7 @@ fn main() {
                                     iput.position -= right * SPEED * dt_s;
                                 }
                                 KeyboardInput { state: ElementState::Released, virtual_keycode: Some(VirtualKeyCode::Space), .. } => {
-                                    show_fps = !show_fps;
+                                    fps.show_fps = !fps.show_fps;
                                 }
                                 _ => {}
                             }
@@ -432,7 +456,7 @@ fn main() {
         scene
             .render(&mut encoder, view_mat, projection_mat)
             .expect("Could not render scene");
-        fps.render(dt_s, &mut encoder, &main_color);
+        fps.render(&mut encoder);
 
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
@@ -533,30 +557,42 @@ impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
 }
 
 #[cfg(windows)]
-struct FpsRenderer<R: Resources, F: Factory<R>> {
+struct FpsRenderer<R: Resources> {
     pub show_fps: bool,
-    _marker: ::std::marker::PhantomData<(R, F)>,
+    text_renderer: TextRenderer<R>,
 }
 
 #[cfg(windows)]
-impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
+impl<R: Resources> FpsRenderer<R> {
     #[inline]
-    fn new(_factory: F) -> Result<Self, !> {
+    fn new<F: Factory<R>>(
+        factory: &mut F,
+        rtv: RenderTargetView<R, ColorFormat>,
+        font_collection: FontCollection<'static>,
+    ) -> TextResult<Self> {
+        let text_renderer = TextRenderer::new(factory, rtv, 800, 600, 0.1, 0.1, font_collection)?;
         Ok(FpsRenderer {
             show_fps: false,
-            _marker: ::std::marker::PhantomData,
+            text_renderer,
         })
     }
 
     #[inline]
-    fn render<C, T>(
+    fn render<C: CommandBuffer<R>>(
         &mut self,
-        _dt_s: f32,
-        _encoder: &mut Encoder<R, C>,
-        _target: &RenderTargetView<R, T>,
-    ) where
-        C: CommandBuffer<R>,
-        T: RenderFormat,
-    {
+        encoder: &mut Encoder<R, C>,
+    ) -> TextResult<()> {
+        if self.show_fps {
+            let text = StyledText::new(
+                "Hello",
+                Color::new(1.0, 0.0, 1.0, 1.0),
+                FontScale::uniform(16.0),
+                FontPoint {
+                    x: 900.0,
+                    y: 25.0,
+                });
+            return self.text_renderer.add_text(&text, encoder);
+        }
+        Ok(())
     }
 }

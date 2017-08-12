@@ -17,9 +17,11 @@ use std::fs::File;
 use std::{fmt, io};
 use std::path::Path;
 
+pub type ColorFormat = Rgba8;
+
 pub struct TextRenderer<R: Resources> {
     font_cache: GpuCache,
-    texture: Texture<R, <Rgba8 as Formatted>::Surface>,
+    texture: Texture<R, <ColorFormat as Formatted>::Surface>,
     bundle: Bundle<R, pipe::Data<R>>,
     current_color: [f32; 4],
     font_collection: FontCollection<'static>,
@@ -27,7 +29,7 @@ pub struct TextRenderer<R: Resources> {
 
 impl<R: Resources> TextRenderer<R> {
     pub fn new<F: FactoryExt<R>>(factory: &mut F,
-                                 render_target: RenderTargetView<R, gfx::format::Rgba8>,
+                                 render_target: RenderTargetView<R, ColorFormat>,
                                  width: u16,
                                  height: u16,
                                  scale_tolerance: f32,
@@ -52,7 +54,7 @@ impl<R: Resources> TextRenderer<R> {
                                        TRANSFER_DST | SHADER_RESOURCE,
                                        Usage::Dynamic,
                                        Some(ChannelType::Unorm))?;
-        let srv = factory.view_texture_as_shader_resource::<Rgba8>(&t, (1, 1), Swizzle::new())?;
+        let srv = factory.view_texture_as_shader_resource::<ColorFormat>(&t, (1, 1), Swizzle::new())?;
         let sampler = factory.create_sampler_linear();
         let pso = factory.create_pipeline_simple(VERT_SRC, FRAG_SRC, pipe::new())?;
         let (vbuf, slice) = factory.create_vertex_buffer_with_slice(PLANE, INDICES);
@@ -102,7 +104,7 @@ impl<R: Resources> TextRenderer<R> {
                 format: (),
                 mipmap: 1,
             };
-            texture_update_error = texture_update_encoder.update_texture::<_, Rgba8>(texture,
+            texture_update_error = texture_update_encoder.update_texture::<_, ColorFormat>(texture,
                                                                                      None,
                                                                                      img_info,
                                                                                      &data[..]).err();
@@ -148,7 +150,7 @@ gfx_defines! {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         text_sampler: gfx::TextureSampler<[f32; 4]> = "f_TextSampler",
         locals: gfx::ConstantBuffer<Locals> = "f_TextLocals",
-        out: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
+        out: gfx::RenderTarget<ColorFormat> = "Target0",
     }
 }
 
