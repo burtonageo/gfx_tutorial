@@ -456,7 +456,7 @@ fn main() {
         scene
             .render(&mut encoder, view_mat, projection_mat)
             .expect("Could not render scene");
-        fps.render(&mut encoder);
+        fps.render(&mut encoder).expect("Could not render fps counter");
 
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
