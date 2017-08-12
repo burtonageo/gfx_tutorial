@@ -46,6 +46,7 @@ impl Error for GetAssetsFolderError {
     }
 }
 
+#[allow(dead_code)]
 pub fn open_file_relative_to_assets<P: AsRef<Path>>(
     relative_path: P,
 ) -> Result<File, OpenAssetsFileError> {
