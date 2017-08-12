@@ -51,7 +51,6 @@ use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, UnitQuaternion, Vector3};
 use num::{cast, NumCast, One, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
-use std::env::args;
 use std::ops::{Div, Neg};
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
@@ -252,7 +251,7 @@ fn main() {
                 &backend,
                 main_color.clone(),
                 main_depth.clone(),
-                &args().nth(1).unwrap_or("suzanne".into()),
+                "suzanne",
                 "img/checker.png",
             ).expect("Could not load model");
 
@@ -261,7 +260,7 @@ fn main() {
                 &backend,
                 main_color.clone(),
                 main_depth.clone(),
-                &args().nth(1).unwrap_or("cube".into()),
+                "cube",
                 "img/checker.png",
             ).expect("Could not load model");
 
