@@ -591,7 +591,8 @@ impl<R: Resources> FpsRenderer<R> {
                     x: 900.0,
                     y: 25.0,
                 });
-            return self.text_renderer.add_text(&text, encoder);
+            self.text_renderer.add_text(&text, encoder)?;
+            self.text_renderer.encode(encoder);
         }
         Ok(())
     }
