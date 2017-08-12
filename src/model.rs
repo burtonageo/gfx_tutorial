@@ -57,10 +57,9 @@ impl<R: Resources> Model<R> {
             let sampler = factory.create_sampler_linear();
 
             let (verts, inds) = load_obj(model_name)?;
-            let (vertex_buffer, slice) =
-                factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
+            let (vbuf, slice) = factory.create_vertex_buffer_with_slice(&verts[..], &inds[..]);
             let data = pipe::Data {
-                vbuf: vertex_buffer,
+                vbuf,
                 vert_locals: factory.create_constant_buffer(1),
                 shared_locals: factory.create_constant_buffer(1),
                 lights: factory.create_constant_buffer(MAX_LIGHTS),
