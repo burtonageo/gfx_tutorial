@@ -28,20 +28,33 @@ pub struct TextRenderer<R: Resources> {
 }
 
 impl<R: Resources> TextRenderer<R> {
-    pub fn new<F: FactoryExt<R>>(factory: &mut F,
-                                 render_target: RenderTargetView<R, ColorFormat>,
-                                 width: u16,
-                                 height: u16,
-                                 scale_tolerance: f32,
-                                 position_tolerance: f32,
-                                 font_collection: FontCollection<'static>)
-                                 -> TextResult<Self> {
-    	const PLANE: &[Vertex] = &[
-            Vertex { pos: [ -1.0, -1.0, 0.0 ], tex: [0.0, 0.0] },
-            Vertex { pos: [  1.0, -1.0, 0.0 ], tex: [0.0, 0.0] },
-            Vertex { pos: [  1.0,  1.0, 0.0 ], tex: [0.0, 0.0] },
-            Vertex { pos: [ -1.0,  1.0, 0.0 ], tex: [0.0, 0.0] },
-    	];
+    pub fn new<F: FactoryExt<R>>(
+        factory: &mut F,
+        render_target: RenderTargetView<R, ColorFormat>,
+        width: u16,
+        height: u16,
+        scale_tolerance: f32,
+        position_tolerance: f32,
+        font_collection: FontCollection<'static>,
+    ) -> TextResult<Self> {
+        const PLANE: &[Vertex] = &[
+            Vertex {
+                pos: [-1.0, -1.0, 0.0],
+                tex: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [1.0, -1.0, 0.0],
+                tex: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [1.0, 1.0, 0.0],
+                tex: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [-1.0, 1.0, 0.0],
+                tex: [0.0, 0.0],
+            },
+        ];
 
         const INDICES: &[u16] = &[0u16, 1, 2, 2, 3, 0];
 
@@ -49,14 +62,24 @@ impl<R: Resources> TextRenderer<R> {
         const FRAG_SRC: &[u8] = include_bytes!("../data/glsl/text.fs");
 
         let kind = Kind::D2(width, height, AaMode::Single);
-        let t = factory.create_texture(kind,
-                                       1,
-                                       TRANSFER_DST | SHADER_RESOURCE,
-                                       Usage::Dynamic,
-                                       Some(ChannelType::Unorm))?;
-        let srv = factory.view_texture_as_shader_resource::<ColorFormat>(&t, (1, 1), Swizzle::new())?;
+        let t = factory.create_texture(
+            kind,
+            1,
+            TRANSFER_DST | SHADER_RESOURCE,
+            Usage::Dynamic,
+            Some(ChannelType::Unorm),
+        )?;
+        let srv = factory.view_texture_as_shader_resource::<ColorFormat>(
+            &t,
+            (1, 1),
+            Swizzle::new(),
+        )?;
         let sampler = factory.create_sampler_linear();
-        let pso = factory.create_pipeline_simple(VERT_SRC, FRAG_SRC, pipe::new())?;
+        let pso = factory.create_pipeline_simple(
+            VERT_SRC,
+            FRAG_SRC,
+            pipe::new(),
+        )?;
         let (vbuf, slice) = factory.create_vertex_buffer_with_slice(PLANE, INDICES);
 
         let data = pipe::Data {
@@ -67,7 +90,12 @@ impl<R: Resources> TextRenderer<R> {
         };
 
         Ok(TextRenderer {
-            font_cache: GpuCache::new(width as u32, height as u32, scale_tolerance, position_tolerance),
+            font_cache: GpuCache::new(
+                width as u32,
+                height as u32,
+                scale_tolerance,
+                position_tolerance,
+            ),
             texture: t,
             bundle: Bundle::new(slice, pso, data),
             current_color: Default::default(),
@@ -75,13 +103,16 @@ impl<R: Resources> TextRenderer<R> {
         })
     }
 
-    pub fn add_text<C: CommandBuffer<R>>(&mut self,
-                                         text: &StyledText,
-                                         texture_update_encoder: &mut Encoder<R, C>)
-                                         -> TextResult<()> {
+    pub fn add_text<C: CommandBuffer<R>>(
+        &mut self,
+        text: &StyledText,
+        texture_update_encoder: &mut Encoder<R, C>,
+    ) -> TextResult<()> {
         self.current_color = text.color.to_slice_rgba();
         let fid = text.font_index;
-        let font = self.font_collection.font_at(fid).ok_or(Error::FontNotFound(fid))?;
+        let font = self.font_collection.font_at(fid).ok_or(
+            Error::FontNotFound(fid),
+        )?;
 
         for glyph in font.layout(text.string, text.scale, text.position) {
             self.font_cache.queue_glyph(fid, glyph);
@@ -91,8 +122,11 @@ impl<R: Resources> TextRenderer<R> {
         let texture = &self.texture;
 
         self.font_cache.cache_queued(|rect, pix_data| {
-            let data = pix_data.iter().map(|&byte| [255, 0, 0, byte]).collect::<Vec<_>>();
-            let Point {x, y} = rect.min;
+            let data = pix_data
+                .iter()
+                .map(|&byte| [255, 0, 0, byte])
+                .collect::<Vec<_>>();
+            let Point { x, y } = rect.min;
             let (w, h) = (rect.width() as u16, rect.height() as u16);
             let img_info = NewImageInfo {
                 xoffset: x as u16,
@@ -104,13 +138,16 @@ impl<R: Resources> TextRenderer<R> {
                 format: (),
                 mipmap: 1,
             };
-            texture_update_error = texture_update_encoder.update_texture::<_, ColorFormat>(texture,
-                                                                                     None,
-                                                                                     img_info,
-                                                                                     &data[..]).err();
+            texture_update_error = texture_update_encoder
+                .update_texture::<_, ColorFormat>(texture, None, img_info, &data[..])
+                .err();
         })?;
 
-        if let Some(res) = texture_update_error { Err(From::from(res)) } else { Ok(()) }
+        if let Some(res) = texture_update_error {
+            Err(From::from(res))
+        } else {
+            Ok(())
+        }
     }
 
     #[inline]
@@ -120,7 +157,10 @@ impl<R: Resources> TextRenderer<R> {
 
     #[inline]
     pub fn encode<C: CommandBuffer<R>>(&self, encoder: &mut Encoder<R, C>) {
-        encoder.update_constant_buffer(&self.bundle.data.locals, &Locals { text_color: self.current_color });
+        encoder.update_constant_buffer(
+            &self.bundle.data.locals,
+            &Locals { text_color: self.current_color },
+        );
         self.bundle.encode(encoder);
     }
 }
@@ -164,7 +204,10 @@ pub fn read_fonts(font_paths: &[&Path]) -> Result<FontCollection<'static>, ReadF
         .iter()
         .map(&open_font_asset)
         .collect::<Result<Vec<_>, io::Error>>()?;
-    let mut all_fonts = all_fonts.into_iter().fold(open_font_asset(first)?, |f0, f1| Box::new(f0.chain(f1)));
+    let mut all_fonts = all_fonts.into_iter().fold(
+        open_font_asset(first)?,
+        |f0, f1| Box::new(f0.chain(f1)),
+    );
 
     let mut bytes = vec![];
     all_fonts.read_to_end(&mut bytes)?;
@@ -175,7 +218,7 @@ pub fn read_fonts(font_paths: &[&Path]) -> Result<FontCollection<'static>, ReadF
 pub enum ReadFontsError {
     NoPathsGiven,
     Io(io::Error),
-} 
+}
 
 impl fmt::Display for ReadFontsError {
     #[inline]
@@ -302,7 +345,7 @@ impl StdError for Error {
             Error::ResourceView(_) => "an error occurred while creating an srv from the texture",
             Error::CacheRead(_) => "an error occurred when reading from the cache",
             Error::CacheWrite(_) => "an error occurred when writing to the cache",
-            Error::FontNotFound(_) => "the font could not be found at the index"
+            Error::FontNotFound(_) => "the font could not be found at the index",
         }
     }
 
@@ -320,21 +363,21 @@ impl StdError for Error {
 }
 
 impl From<CombinedError> for Error {
-	#[inline]
+    #[inline]
     fn from(e: CombinedError) -> Self {
         Error::Gfx(e)
     }
 }
 
 impl From<PipelineStateError<String>> for Error {
-	#[inline]
+    #[inline]
     fn from(e: PipelineStateError<String>) -> Self {
         Error::Pso(e)
     }
 }
 
 impl<'a> From<PipelineStateError<&'a str>> for Error {
-	#[inline]
+    #[inline]
     fn from(e: PipelineStateError<&'a str>) -> Self {
         Error::Pso(e.into())
     }
@@ -362,14 +405,14 @@ impl From<ResourceViewError> for Error {
 }
 
 impl From<CacheReadErr> for Error {
-	#[inline]
+    #[inline]
     fn from(e: CacheReadErr) -> Self {
         Error::CacheRead(e)
     }
 }
 
 impl From<CacheWriteErr> for Error {
-	#[inline]
+    #[inline]
     fn from(e: CacheWriteErr) -> Self {
         Error::CacheWrite(e)
     }
