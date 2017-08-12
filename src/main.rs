@@ -1,4 +1,5 @@
 #![feature(conservative_impl_trait, never_type)]
+#![warn(missing_debug_implementations)]
 
 extern crate alga;
 extern crate ang;
@@ -42,7 +43,7 @@ mod model;
 mod util;
 
 use ang::{Angle, Degrees};
-use gfx::{CommandBuffer, Device, Encoder, Factory, Resources};
+use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
 use gfx::format::{RenderFormat, Rgba8};
 use gfx::handle::RenderTargetView;
 use gfx_rusttype::{Color, read_fonts, TextRenderer, StyledText};
@@ -56,24 +57,28 @@ use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
 
 gfx_defines! {
+    #[derive(Default)]
     vertex Vertex {
         pos: [f32; 3] = "position",
         uv: [f32; 2] = "tex_coord",
         normal: [f32; 3] = "normal",
     }
 
+    #[derive(Default)]
     constant ShaderLight {
         col: [f32; 4] = "color",
         pos: [f32; 3] = "position",
         power: f32 = "power",
     }
 
+    #[derive(Default)]
     constant VertLocals {
         projection: [[f32; 4]; 4] = "projection_matrix",
         model: [[f32; 4]; 4] = "model_matrix",
         view: [[f32; 4]; 4] = "view_matrix",
     }
 
+    #[derive(Default)]
     constant SharedLocals {
         num_lights: u32 = "num_lights",
     }
@@ -181,6 +186,39 @@ impl From<Light> for ShaderLight {
 
 const MAX_LIGHTS: usize = 10;
 
+struct Scene<R: Resources> {
+    lights: Vec<ShaderLight>,
+    models: Vec<Model<R>>,
+}
+
+impl<R: Resources> Scene<R> {
+    fn new<L: Into<ShaderLight>>(lights: Vec<L>, models: Vec<Model<R>>) -> Self {
+        let lights = lights.into_iter().map(Into::into).collect();
+        Scene { lights, models }
+    }
+
+    fn update_views<W: PlatformWindow<R>>(&mut self, window: &W) {
+        for model in &mut self.models {
+            model.update_views(window)
+        }
+    }
+
+    fn render<C: CommandBuffer<R>>(
+        &self,
+        encoder: &mut Encoder<R, C>,
+        view_matrix: Matrix4<f32>,
+        projection_matrix: Matrix4<f32>)
+        -> Result<(), UpdateError<usize>>
+    {
+        for model in &self.models {
+            model.update_matrices(encoder, &view_matrix, &projection_matrix);
+            model.update_lights(encoder, &self.lights)?;
+            model.encode(encoder);
+        }
+        Ok(())
+    }
+}
+
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
     let builder = {
@@ -225,9 +263,9 @@ fn main() {
         "img/checker.png",
     ).expect("Could not load model");
 
-    let mut scene = vec![monkey_model, cube_model];
-    scene[0].similarity.isometry.translation.vector[1] += 2.0f32;
-    scene[1].similarity.isometry.translation.vector[1] -= 2.0f32;
+    let mut models = vec![monkey_model, cube_model];
+    models[0].similarity.isometry.translation.vector[1] += 2.0f32;
+    models[1].similarity.isometry.translation.vector[1] -= 2.0f32;
 
     let lights: Vec<ShaderLight> = {
         let l0 = Light::new(Point3::new(0.0, 0.0, 3.0), [0.1, 0.1, 1.0, 1.0], 200.0);
@@ -242,6 +280,7 @@ fn main() {
             .map(Into::into)
             .collect()
     };
+    let mut scene = Scene::new(lights, models);
 
     let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
 
@@ -288,9 +327,7 @@ fn main() {
             let (w, h) = window.windowext_get_inner_size();
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    for model in &mut scene {
-                        model.update_views(&window);
-                    }
+                    scene.update_views(&window);
                     projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
@@ -309,9 +346,7 @@ fn main() {
                         }
                         #[cfg(not(target_os = "macos"))]
                         WindowEvent::Resized(..) => {
-                            for model in &mut scene {
-                                model.update_views(&window);
-                            }
+                            scene.update_views(&window);
                             projection.set_aspect(window.aspect());
                         }
                         WindowEvent::MouseMoved { position: (x, y), .. } => {
@@ -370,7 +405,7 @@ fn main() {
         }
 
         let rot = UnitQuaternion::from_euler_angles(0.0, Degrees(25.0 * dt_s).in_radians(), 0.0);
-        for model in &mut scene {
+        for model in &mut scene.models {
             model.similarity.append_rotation_mut(&rot);
         }
 
@@ -389,15 +424,9 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let projection_mat = projection.to_homogeneous();
 
-        for model in &scene {
-            model.update_matrices(&mut encoder, &view_mat, &projection_mat);
-            model.update_lights(&mut encoder, &lights).expect(
-                "Could not update lights",
-            );
-            model.encode(&mut encoder);
-        }
-
+        scene.render(&mut encoder, view_mat, projection_mat).expect("Could not render scene");
         fps.render(dt_s, &mut encoder, &main_color);
+
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
