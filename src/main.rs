@@ -145,7 +145,7 @@ impl Camera {
 }
 
 const SPEED: f32 = 7.0;
-const MOUSE_SPEED: f32 = 7.0;
+const MOUSE_SPEED: f32 = 4.0;
 
 #[derive(Clone, Debug, PartialEq)]
 struct Light {
@@ -207,9 +207,8 @@ impl<R: Resources> Scene<R> {
         &self,
         encoder: &mut Encoder<R, C>,
         view_matrix: Matrix4<f32>,
-        projection_matrix: Matrix4<f32>)
-        -> Result<(), UpdateError<usize>>
-    {
+        projection_matrix: Matrix4<f32>,
+    ) -> Result<(), UpdateError<usize>> {
         for model in &self.models {
             model.update_matrices(encoder, &view_matrix, &projection_matrix);
             model.update_lights(encoder, &self.lights)?;
@@ -245,42 +244,49 @@ fn main() {
     );
 
     let mut encoder = factory.create_encoder();
-    let monkey_model = Model::load(
-        &mut factory,
-        &backend,
-        main_color.clone(),
-        main_depth.clone(),
-        &args().nth(1).unwrap_or("suzanne".into()),
-        "img/checker.png",
-    ).expect("Could not load model");
 
-    let cube_model = Model::load(
-        &mut factory,
-        &backend,
-        main_color.clone(),
-        main_depth.clone(),
-        &args().nth(1).unwrap_or("cube".into()),
-        "img/checker.png",
-    ).expect("Could not load model");
+    let mut scene = {
+        let models = {
+            let mut monkey_model = Model::load(
+                &mut factory,
+                &backend,
+                main_color.clone(),
+                main_depth.clone(),
+                &args().nth(1).unwrap_or("suzanne".into()),
+                "img/checker.png",
+            ).expect("Could not load model");
 
-    let mut models = vec![monkey_model, cube_model];
-    models[0].similarity.isometry.translation.vector[1] += 2.0f32;
-    models[1].similarity.isometry.translation.vector[1] -= 2.0f32;
+            let mut cube_model = Model::load(
+                &mut factory,
+                &backend,
+                main_color.clone(),
+                main_depth.clone(),
+                &args().nth(1).unwrap_or("cube".into()),
+                "img/checker.png",
+            ).expect("Could not load model");
 
-    let lights: Vec<ShaderLight> = {
-        let l0 = Light::new(Point3::new(0.0, 0.0, 3.0), [0.1, 0.1, 1.0, 1.0], 200.0);
-        let l1 = Light::new(Point3::new(0.0, 0.0, -2.0), [1.0, 0.0, 0.0, 1.0], 300.0);
-        let l2 = Light::new(Point3::new(-3.0, 1.0, 0.0), [0.0, 1.0, 0.0, 1.0], 80.0);
-        let l3 = Light::new(Point3::new(1.5, -3.0, 0.0), [1.0, 1.0, 0.0, 0.3], 80.0);
-        let l4 = Light::new(Point3::new(3.0, 0.0, 1.0), [0.0, 1.0, 1.0, 0.2], 80.0);
-        let l5 = Light::new(Point3::new(0.0, 5.0, 0.0), [1.0, 0.0, 1.0, 1.0], 80.0);
+            monkey_model.similarity.isometry.translation.vector[1] += 2.0f32;
+            cube_model.similarity.isometry.translation.vector[1] -= 2.0f32;
 
-        vec![l0, l1, l2, l3, l4, l5]
-            .into_iter()
-            .map(Into::into)
-            .collect()
+            vec![monkey_model, cube_model]
+        };
+
+        let lights: Vec<ShaderLight> = {
+            let l0 = Light::new(Point3::new(0.0, 0.0, 3.0), [0.1, 0.1, 1.0, 1.0], 20.0);
+            let l1 = Light::new(Point3::new(0.0, 0.0, -2.0), [1.0, 0.0, 0.0, 1.0], 10.0);
+            let l2 = Light::new(Point3::new(0.0, 2.2, 0.0), [0.0, 1.0, 0.0, 1.0], 1600.0);
+            let l3 = Light::new(Point3::new(1.5, -3.0, 0.0), [1.0, 1.0, 0.0, 0.3], 20.0);
+            let l4 = Light::new(Point3::new(3.0, 0.0, 1.0), [0.0, 1.0, 1.0, 0.2], 30.0);
+            let l5 = Light::new(Point3::new(0.0, -1.8, 0.0), [1.0, 0.0, 1.0, 1.0], 1600.0);
+
+            vec![l0, l1, l2, l3, l4, l5]
+                .into_iter()
+                .map(Into::into)
+                .collect()
+        };
+
+        Scene::new(lights, models)
     };
-    let mut scene = Scene::new(lights, models);
 
     let mut fps = FpsRenderer::new(factory).expect("Could not create text renderer");
 
@@ -424,7 +430,9 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let projection_mat = projection.to_homogeneous();
 
-        scene.render(&mut encoder, view_mat, projection_mat).expect("Could not render scene");
+        scene
+            .render(&mut encoder, view_mat, projection_mat)
+            .expect("Could not render scene");
         fps.render(dt_s, &mut encoder, &main_color);
 
         encoder.flush(&mut device);
