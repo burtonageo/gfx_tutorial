@@ -163,11 +163,7 @@ impl Light {
 impl Default for Light {
     #[inline]
     fn default() -> Self {
-        Light {
-            position: na::origin(),
-            color: [na::zero(); 4],
-            power: na::zero(),
-        }
+        Light::new(na::origin(), [na::zero(); 4], na::zero())
     }
 }
 
