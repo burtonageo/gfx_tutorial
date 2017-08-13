@@ -1,7 +1,5 @@
 #version 150 core
 
-const int MAX_LIGHTS = 10;
-
 in vec3 position;
 in vec2 tex_coord;
 in vec3 normal;
