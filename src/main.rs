@@ -1,4 +1,4 @@
-#![feature(conservative_impl_trait, never_type)]
+#![feature(never_type)]
 #![warn(missing_debug_implementations)]
 
 extern crate alga;
