@@ -48,7 +48,7 @@ use gfx::format::Rgba8;
 use gfx::handle::RenderTargetView;
 use gfx_rusttype::{Color, read_fonts, TextRenderer, TextResult, StyledText};
 use model::Model;
-use na::{Isometry3, Matrix4, Perspective3, Point3, PointBase, UnitQuaternion, Vector3};
+use na::{Isometry3, Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
 use num::{cast, NumCast, One, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use rusttype::{FontCollection, Point as FontPoint, Scale as FontScale};
@@ -437,7 +437,7 @@ fn main() {
             let up = right.cross(&direction);
             Isometry3::look_at_lh(
                 &iput.position,
-                &PointBase::from_coordinates(iput.position.coords + direction),
+                &Point::from_coordinates(iput.position.coords + direction),
                 &up,
             )
         };
