@@ -496,71 +496,12 @@ impl WindowExt for winit::Window {
     }
 }
 
-#[cfg(not(windows))]
-struct FpsRenderer<R: Resources, F: Factory<R>> {
-    pub show_fps: bool,
-    fps_string: String,
-    text_renderer: gfx_text::Renderer<R, F>,
-}
-
-#[cfg(not(windows))]
-impl<R: Resources, F: Factory<R>> FpsRenderer<R, F> {
-    #[inline]
-    fn new(factory: F) -> Result<Self, gfx_text::Error> {
-        /*
-        let mut text_renderer = {
-            const POS_TOLERANCE: f32 = 0.1;
-            const SCALE_TOLERANCE: f32 = 0.1;
-            let (w, h) = window.windowext_get_inner_size::<u16>();
-            TextRenderer::new(&mut factory, data.out.clone(), w, h, POS_TOLERANCE, SCALE_TOLERANCE,
-                            read_fonts("fonts/noto_sans/NotoSans-Regular.ttf".as_ref(),
-                                        &["fonts/noto_sans/NotoSans-Bold.ttf".as_ref(),
-                                        "fonts/noto_sans/NotoSans-Italic.ttf".as_ref(),
-                                        "fonts/noto_sans/NotoSans-BoldItalic.ttf".as_ref()]).unwrap())
-                .expect("Could not create text renderer")
-        };
-        */
-
-        FpsRenderer {
-            show_fps: false,
-            fps_string: String::with_capacity(12), // enough space to display "fps: xxx.yy"
-            text_renderer: gfx_text::new(factory).build()?,
-        }
-    }
-
-    fn render<C, T>(
-        &mut self,
-        dt_s: f32,
-        encoder: &mut Encoder<R, C>,
-        target: &RenderTargetView<R, T>,
-    ) where
-        C: CommandBuffer<R>,
-        T: RenderFormat,
-    {
-        if self.show_fps {
-            use std::fmt::Write;
-            self.fps_string
-                .write_fmt(format_args!("fps: {:.*}", 2, 1.0 / dt_s))
-                .unwrap();
-            self.text_renderer.add(
-                &self.fps_string,
-                [10, 20],
-                [0.65, 0.16, 0.16, 1.0],
-            );
-            self.text_renderer.draw(encoder, target).unwrap();
-            self.fps_string.clear();
-        }
-    }
-}
-
-#[cfg(windows)]
 #[derive(Debug)]
 struct FpsRenderer<R: Resources> {
     pub show_fps: bool,
     text_renderer: TextRenderer<R>,
 }
 
-#[cfg(windows)]
 impl<R: Resources> FpsRenderer<R> {
     #[inline]
     fn new<F: Factory<R>>(
