@@ -23,24 +23,20 @@ impl Vertex {
 
 pub fn load_obj(obj_name: &str) -> Result<(Vec<Vertex>, Vec<Index>), LoadObjError> {
     use wavefront_obj::obj::Primitive;
-    let mut obj_string = String::new();
-    {
+    let obj_string = {
+        let mut s = String::new();
         let mut obj_file_name = get_assets_folder().map(|p| p.to_path_buf())?;
         obj_file_name.push(&format!("mesh/{}.obj", obj_name));
         File::open(obj_file_name).and_then(|mut f| {
-            f.read_to_string(&mut obj_string)
+            f.read_to_string(&mut s)
         })?;
-    }
-
-    let obj = obj::parse(obj_string)?;
-    let object = match obj.objects.get(0) {
-        Some(o) => o,
-        None => return Err(LoadObjError::NoMeshFound),
+        s
     };
 
-    let mut verts = Vec::new();
-    let mut uvs = Vec::new();
-    let mut norms = Vec::new();
+    let obj = obj::parse(obj_string)?;
+    let object = obj.objects.get(0).ok_or(LoadObjError::NoMeshFound)?;
+
+    let (mut verts, mut uvs, mut norms): (Vec<_>, Vec<_>, Vec<_>) = Default::default();
 
     for s in object.geometry.iter().flat_map(|g| g.shapes.iter()) {
         match s.primitive {
@@ -172,22 +168,22 @@ fn build_unified_buffers(
     let mut out_inds = Vec::new();
     let mut vert_to_out = BTreeMap::new();
 
-    for packed in vertices
+    vertices
         .iter()
         .zip(tex_coords.iter())
         .zip(normals.iter())
         .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n))
-    {
-        match vert_to_out.entry(packed.clone()) {
-            Entry::Occupied(e) => out_inds.push(*e.get()),
-            Entry::Vacant(e) => {
-                out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
-                let new_index = (out_verts.len() - 1) as Index;
-                out_inds.push(new_index);
-                e.insert(new_index);
+        .for_each(|packed| {
+            match vert_to_out.entry(packed.clone()) {
+                Entry::Occupied(e) => out_inds.push(*e.get()),
+                Entry::Vacant(e) => {
+                    out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
+                    let new_index = (out_verts.len() - 1) as Index;
+                    out_inds.push(new_index);
+                    e.insert(new_index);
+                }
             }
-        }
-    }
+        });
 
     (out_verts, out_inds)
 }
