@@ -146,8 +146,8 @@ impl Eq for PackedObjVertex {}
 impl Ord for PackedObjVertex {
     fn cmp(&self, other: &Self) -> Ordering {
         // Arbitrary equality for BTreeMap
-        let pself = self as *const _;
-        let pother = other as *const _;
+        let pself = self as *const PackedObjVertex;
+        let pother = other as *const PackedObjVertex;
         pself.cmp(&pother)
     }
 }
