@@ -62,7 +62,7 @@ impl<R: Resources> TextRenderer<R> {
         const FRAG_SRC: &[u8] = include_bytes!("../data/glsl/text.fs");
 
         let kind = Kind::D2(width, height, AaMode::Single);
-        let t = factory.create_texture(
+        let texture = factory.create_texture(
             kind,
             1,
             TRANSFER_DST | SHADER_RESOURCE,
@@ -70,7 +70,7 @@ impl<R: Resources> TextRenderer<R> {
             Some(ChannelType::Unorm),
         )?;
         let srv = factory.view_texture_as_shader_resource::<ColorFormat>(
-            &t,
+            &texture,
             (1, 1),
             Swizzle::new(),
         )?;
@@ -83,7 +83,7 @@ impl<R: Resources> TextRenderer<R> {
         let (vbuf, slice) = factory.create_vertex_buffer_with_slice(PLANE, INDICES);
 
         let data = pipe::Data {
-            vbuf: vbuf,
+            vbuf,
             locals: factory.create_constant_buffer(1),
             text_sampler: (srv, sampler),
             out: render_target,
@@ -96,10 +96,10 @@ impl<R: Resources> TextRenderer<R> {
                 scale_tolerance,
                 position_tolerance,
             ),
-            texture: t,
+            texture,
             bundle: Bundle::new(slice, pso, data),
             current_color: Default::default(),
-            font_collection: font_collection,
+            font_collection,
         })
     }
 
@@ -124,7 +124,7 @@ impl<R: Resources> TextRenderer<R> {
         self.font_cache.cache_queued(|rect, pix_data| {
             let data = pix_data
                 .iter()
-                .map(|&byte| [255, 0, 0, byte])
+                .map(|&byte| [255, 255, 255, byte])
                 .collect::<Vec<_>>();
             let Point { x, y } = rect.min;
             let (w, h) = (rect.width() as u16, rect.height() as u16);
@@ -144,10 +144,10 @@ impl<R: Resources> TextRenderer<R> {
         })?;
 
         if let Some(res) = texture_update_error {
-            Err(From::from(res))
-        } else {
-            Ok(())
+            return Err(From::from(res));
         }
+
+        Ok(())
     }
 
     #[inline]
@@ -168,15 +168,16 @@ impl<R: Resources> TextRenderer<R> {
 impl<R: Resources> fmt::Debug for TextRenderer<R> {
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
         fmtr.debug_struct("TextRenderer")
-            .field("font_cache", &"rusttype::gpu_cache::Cache { .. }")
+            .field("font_cache", &"Cache { .. }")
             .field("texture", &self.texture)
-            .field("bundle", &"gfx::pso::bundle::Bundle { .. }")
+            .field("bundle", &"Bundle { .. }")
             .field("current_color", &self.current_color)
             .finish()
     }
 }
 
 gfx_defines! {
+    #[derive(Default)]
     vertex Vertex {
         pos: [f32; 3] = "v_Pos",
         tex: [f32; 2] = "v_Tex",
@@ -190,7 +191,11 @@ gfx_defines! {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         text_sampler: gfx::TextureSampler<[f32; 4]> = "f_TextSampler",
         locals: gfx::ConstantBuffer<Locals> = "f_TextLocals",
-        out: gfx::RenderTarget<ColorFormat> = "Target0",
+        out: gfx::BlendTarget<ColorFormat> = (
+            "Target0",
+            gfx::state::ALPHA,
+            gfx::preset::blend::ALPHA,
+        ),
     }
 }
 
