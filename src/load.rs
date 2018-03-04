@@ -127,7 +127,7 @@ impl Error for LoadObjError {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 struct PackedObjVertex {
     pos: obj::Vertex,
     uv: obj::TVertex,
@@ -164,8 +164,7 @@ fn build_unified_buffers(
     tex_coords: &[obj::TVertex],
     normals: &[obj::Normal],
 ) -> (Vec<Vertex>, Vec<Index>) {
-    let mut out_verts = Vec::new();
-    let mut out_inds = Vec::new();
+    let (mut out_verts, mut out_inds): (Vec<_>, Vec<_>) = Default::default();
     let mut vert_to_out = BTreeMap::new();
 
     vertices
@@ -174,7 +173,7 @@ fn build_unified_buffers(
         .zip(normals.iter())
         .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n))
         .for_each(|packed| {
-            match vert_to_out.entry(packed.clone()) {
+            match vert_to_out.entry(packed) {
                 Entry::Occupied(e) => out_inds.push(*e.get()),
                 Entry::Vacant(e) => {
                     out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
