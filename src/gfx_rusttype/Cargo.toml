@@ -1,8 +1,0 @@
-[package]
-name = "gfx_rusttype"
-version = "0.1.0"
-authors = ["georgeburton"]
-
-[dependencies]
-gfx = "0.16"
-rusttype = "0.2"

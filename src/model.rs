@@ -4,7 +4,7 @@ use gfx::{Bundle, CombinedError, CommandBuffer, Encoder, PipelineStateError, Pri
           UpdateError};
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use gfx::state::Rasterizer;
-use gfx::texture::{AaMode, Kind};
+use gfx::texture::{AaMode, Kind, Mipmap};
 use image::{self, ImageError};
 use load::{load_obj, LoadObjError};
 use na::{Matrix4, Similarity3};
@@ -50,6 +50,7 @@ impl<R: Resources> Model<R> {
                 let kind = Kind::D2(iw as u16, ih as u16, AaMode::Single);
                 factory.create_texture_immutable_u8::<ColorFormat>(
                     kind,
+                    Mipmap::Provided,
                     &[&img],
                 )?
             };

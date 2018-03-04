@@ -3,16 +3,16 @@
 
 extern crate alga;
 extern crate ang;
+#[macro_use]
+extern crate conrod;
 extern crate find_folder;
 #[macro_use]
 extern crate gfx;
-extern crate gfx_rusttype;
 extern crate image;
 #[macro_use]
 extern crate lazy_static;
 extern crate num;
 extern crate nalgebra as na;
-extern crate rusttype;
 #[macro_use]
 extern crate scopeguard;
 extern crate time;
@@ -46,12 +46,10 @@ use ang::{Angle, Degrees};
 use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
 use gfx::format::Rgba8;
 use gfx::handle::RenderTargetView;
-use gfx_rusttype::{Color, read_fonts, TextRenderer, TextResult, StyledText};
 use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
 use num::{cast, NumCast, One, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
-use rusttype::{FontCollection, Point as FontPoint, Scale as FontScale};
 use std::ops::{Div, Neg};
 use std::path::{Path, PathBuf};
 use std::time::Duration as StdDuration;
@@ -222,7 +220,7 @@ impl<R: Resources> Scene<R> {
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
     let builder = {
-        let primary_monitor = winit::get_primary_monitor();
+        let primary_monitor = events_loop.get_primary_monitor();
         let (win_w, win_h) = primary_monitor.get_dimensions();
         winit::WindowBuilder::new()
             .with_dimensions(win_w, win_h)
@@ -284,6 +282,7 @@ fn main() {
         Scene::new(lights, models)
     };
 
+    /*
     let fonts = {
         let owned_font_paths = vec![
             "NotoSans-Bold.ttf",
@@ -306,8 +305,7 @@ fn main() {
         }
         read_fonts(&borrowed_font_paths).expect("Could not create fonts")
     };
-    let mut fps = FpsRenderer::new(&mut factory, main_color.clone(), fonts)
-        .expect("Could not create text renderer");
+    */
 
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
@@ -373,7 +371,7 @@ fn main() {
                             scene.update_views(&window);
                             projection.set_aspect(window.aspect());
                         }
-                        WindowEvent::MouseMoved { position: (x, y), .. } => {
+                        WindowEvent::CursorMoved { position: (x, y), .. } => {
                             let (ww, wh) = window.windowext_get_inner_size::<i32>();
                             let hidpi = window.hidpi_factor() as f64;
 
@@ -407,9 +405,6 @@ fn main() {
                                 }
                                 KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Right), .. } => {
                                     iput.position -= right * SPEED * dt_s;
-                                }
-                                KeyboardInput { state: ElementState::Released, virtual_keycode: Some(VirtualKeyCode::Space), .. } => {
-                                    fps.show_fps = !fps.show_fps;
                                 }
                                 _ => {}
                             }
@@ -451,9 +446,6 @@ fn main() {
         scene
             .render(&mut encoder, view_mat, projection_mat)
             .expect("Could not render scene");
-        fps.render(&mut encoder).expect(
-            "Could not render fps counter",
-        );
 
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
@@ -490,44 +482,6 @@ impl WindowExt for winit::Window {
             )
         }
 
-        self.get_inner_size_pixels().map(cast_pair).unwrap_or(
-            Default::default(),
-        )
-    }
-}
-
-#[derive(Debug)]
-struct FpsRenderer<R: Resources> {
-    pub show_fps: bool,
-    text_renderer: TextRenderer<R>,
-}
-
-impl<R: Resources> FpsRenderer<R> {
-    #[inline]
-    fn new<F: Factory<R>>(
-        factory: &mut F,
-        rtv: RenderTargetView<R, ColorFormat>,
-        font_collection: FontCollection<'static>,
-    ) -> TextResult<Self> {
-        let text_renderer = TextRenderer::new(factory, rtv, 800, 600, 0.1, 0.1, font_collection)?;
-        Ok(FpsRenderer {
-            show_fps: false,
-            text_renderer,
-        })
-    }
-
-    #[inline]
-    fn render<C: CommandBuffer<R>>(&mut self, encoder: &mut Encoder<R, C>) -> TextResult<()> {
-        if self.show_fps {
-            let text = StyledText::new(
-                "Hello",
-                Color::new(1.0, 0.0, 1.0, 1.0),
-                FontScale::uniform(16.0),
-                FontPoint { x: 900.0, y: 25.0 },
-            );
-            self.text_renderer.add_text(&text, encoder)?;
-            self.text_renderer.encode(encoder);
-        }
-        Ok(())
+        self.get_inner_size().map(cast_pair).unwrap_or(Default::default())
     }
 }

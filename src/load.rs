@@ -23,17 +23,16 @@ impl Vertex {
 
 pub fn load_obj(obj_name: &str) -> Result<(Vec<Vertex>, Vec<Index>), LoadObjError> {
     use wavefront_obj::obj::Primitive;
-    let obj_string = {
-        let mut s = String::new();
-        let mut obj_file_name = get_assets_folder().map(|p| p.to_path_buf())?;
+    let obj = {
+        let mut obj_string = String::new();
+        let mut obj_file_name = get_assets_folder()?.to_path_buf();
         obj_file_name.push(&format!("mesh/{}.obj", obj_name));
         File::open(obj_file_name).and_then(|mut f| {
-            f.read_to_string(&mut s)
+            f.read_to_string(&mut obj_string)
         })?;
-        s
+        obj::parse(obj_string)?
     };
 
-    let obj = obj::parse(obj_string)?;
     let object = obj.objects.get(0).ok_or(LoadObjError::NoMeshFound)?;
 
     let (mut verts, mut uvs, mut norms): (Vec<_>, Vec<_>, Vec<_>) = Default::default();

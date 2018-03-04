@@ -15,24 +15,23 @@ lto = true
 alga = "0.5"
 ang = "0.2"
 find_folder = "0.*"
-gfx = "0.16"
-gfx_device_gl = { version = "0.14", optional = true }
-gfx_window_glutin = { version = "0.17", optional = true }
-glutin = { version = "0.9", optional = true }
-image = "0.15"
+gfx = "0.17"
+gfx_device_gl = { version = "0.15", optional = true }
+gfx_window_glutin = { version = "0.21", optional = true }
+glutin = { version = "0.13", optional = true }
+image = "0.18"
 lazy_static = "0.*"
-nalgebra = "0.13"
+nalgebra = "0.14"
 num = "0.1"
-rusttype = "0.2"
 scopeguard = "0.3"
 time = "0.1"
 void = "1.0.2"
 wavefront_obj = "5.0"
-winit = "0.7"
+winit = "0.11"
 
-[dependencies.gfx_rusttype]
-version =  "0.1"
-path = "src/gfx_rusttype"
+[dependencies.conrod]
+version = "0.58"
+features = ["winit", "gfx"]
 
 [target.'cfg(target_os = "windows")'.dependencies.gfx_device_dx11]
 version = "0.6"
