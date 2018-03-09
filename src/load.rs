@@ -171,15 +171,13 @@ fn build_unified_buffers(
         .zip(tex_coords.iter())
         .zip(normals.iter())
         .map(|((v, t), n)| PackedObjVertex::new(*v, *t, *n))
-        .for_each(|packed| {
-            match vert_to_out.entry(packed) {
-                Entry::Occupied(e) => out_inds.push(*e.get()),
-                Entry::Vacant(e) => {
-                    out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
-                    let new_index = (out_verts.len() - 1) as Index;
-                    out_inds.push(new_index);
-                    e.insert(new_index);
-                }
+        .for_each(|packed| match vert_to_out.entry(packed) {
+            Entry::Occupied(e) => out_inds.push(*e.get()),
+            Entry::Vacant(e) => {
+                out_verts.push(Vertex::new(&packed.pos, &packed.uv, &packed.norm));
+                let new_index = (out_verts.len() - 1) as Index;
+                out_inds.push(new_index);
+                e.insert(new_index);
             }
         });
 
