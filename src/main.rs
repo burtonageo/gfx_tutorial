@@ -480,16 +480,16 @@ fn main() {
             screen_position: (5.0, 5.0),
             scale: Scale::uniform(32.0f32 * window.hidpi_factor()),
             color: [1.0, 1.0, 1.0, 1.0],
-            z: 1.0,
             ..Default::default()
         });
-        glyph_brush
-            .draw_queued(&mut encoder, &main_color, &main_depth)
-            .unwrap();
 
         scene
             .render(&mut encoder, view_mat, projection_mat)
             .expect("Could not render scene");
+
+        glyph_brush
+            .draw_queued(&mut encoder, &main_color, &main_depth)
+            .unwrap();
 
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
