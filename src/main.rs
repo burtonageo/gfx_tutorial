@@ -478,7 +478,7 @@ fn main() {
         glyph_brush.queue(Section {
             text: "Hello, World!",
             screen_position: (5.0, 5.0),
-            scale: Scale::uniform(32.0),
+            scale: Scale::uniform(32.0f32 * window.hidpi_factor()),
             color: [1.0, 1.0, 1.0, 1.0],
             z: 1.0,
             ..Default::default()
