@@ -1,13 +1,12 @@
-#![feature(never_type)]
 #![warn(missing_debug_implementations)]
 
 extern crate alga;
+extern crate apply;
 extern crate ang;
-#[macro_use]
-extern crate conrod;
 extern crate find_folder;
 #[macro_use]
 extern crate gfx;
+extern crate gfx_glyph;
 extern crate image;
 #[macro_use]
 extern crate lazy_static;
@@ -43,15 +42,16 @@ mod model;
 mod util;
 
 use ang::{Angle, Degrees};
-use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
-use gfx::format::Rgba8;
-use gfx::handle::RenderTargetView;
+use apply::Apply;
+use gfx::{CommandBuffer, Device, Encoder, Resources, UpdateError};
+use gfx_glyph::{GlyphBrushBuilder, Scale, Section};
 use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
-use num::{cast, NumCast, One, Zero};
+use num::{cast, NumCast, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use std::fs::File;
+use std::io::Read;
 use std::ops::{Div, Neg};
-use std::path::{Path, PathBuf};
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
 
@@ -125,7 +125,7 @@ impl Input {
     }
 }
 
-#[allow(dead_code)]
+// #[allow(dead_code)]
 #[derive(Debug)]
 struct Camera {
     perspective: Perspective3<f32>,
@@ -185,6 +185,7 @@ impl From<Light> for ShaderLight {
 
 const MAX_LIGHTS: usize = 10;
 
+#[derive(Debug, Default)]
 struct Scene<R: Resources> {
     lights: Vec<ShaderLight>,
     models: Vec<Model<R>>,
@@ -229,7 +230,7 @@ fn main() {
     };
 
     let (backend, window, mut device, mut factory, main_color, main_depth) =
-        platform::launch_gl::<Rgba8, gfx::format::DepthStencil>(
+        platform::launch_gl::<ColorFormat, gfx::format::DepthStencil>(
             builder,
             &events_loop,
             ContextBuilder::new().with_vsync_enabled(true),
@@ -243,6 +244,33 @@ fn main() {
     );
 
     let mut encoder = factory.create_encoder();
+
+    let fonts = [
+        "NotoSans-Bold.ttf",
+        "NotoSans-BoldItalic.ttf",
+        "NotoSans-Italic.ttf",
+        "NotoSans-Regular.ttf",
+    ];
+    let mut glyph_brush = fonts
+        .iter()
+        .map(|p| {
+            util::get_assets_folder()
+                .unwrap()
+                .to_path_buf()
+                .join("fonts")
+                .join("noto_sans")
+                .join(p)
+        })
+        .map(|p| {
+            let mut bytes = Vec::new();
+            File::open(p)
+                .and_then(|mut f| f.read_to_end(&mut bytes))
+                .unwrap();
+            bytes
+        })
+        .collect::<Vec<_>>()
+        .apply(GlyphBrushBuilder::using_fonts_bytes)
+        .build(factory.clone());
 
     let mut scene = {
         let models = {
@@ -281,31 +309,6 @@ fn main() {
 
         Scene::new(lights, models)
     };
-
-    /*
-    let fonts = {
-        let owned_font_paths = vec![
-            "NotoSans-Bold.ttf",
-            "NotoSans-BoldItalic.ttf",
-            "NotoSans-Italic.ttf",
-            "NotoSans-Regular.ttf",
-        ].into_iter()
-            .map(|p| {
-                util::get_assets_folder()
-                    .unwrap()
-                    .to_path_buf()
-                    .join("fonts")
-                    .join("noto_sans")
-                    .join(p)
-            })
-            .collect::<Vec<PathBuf>>();
-        let mut borrowed_font_paths = Vec::with_capacity(owned_font_paths.len());
-        for fp in &owned_font_paths {
-            borrowed_font_paths.push(fp as &Path);
-        }
-        read_fonts(&borrowed_font_paths).expect("Could not create fonts")
-    };
-    */
 
     let mut iput = Input::new();
     let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
@@ -363,7 +366,12 @@ fn main() {
                 Event::WindowEvent { event, .. } => {
                     match event {
                         WindowEvent::Closed |
-                        WindowEvent::KeyboardInput { input: KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Escape), .. }, .. } => {
+                        WindowEvent::KeyboardInput {
+                            input: KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
+                        .. } => {
                             is_running = false;
                         }
                         #[cfg(not(target_os = "macos"))]
@@ -375,8 +383,14 @@ fn main() {
                             let (ww, wh) = window.windowext_get_inner_size::<i32>();
                             let hidpi = window.hidpi_factor() as f64;
 
-                            iput.horizontal_angle += Degrees(MOUSE_SPEED * dt_s * ((ww / 2) as f32 - (x / hidpi) as f32));
-                            iput.vertical_angle -= Degrees(MOUSE_SPEED * dt_s * ((wh / 2) as f32 - (y / hidpi) as f32));
+                            iput.horizontal_angle += Degrees(
+                                MOUSE_SPEED * dt_s *
+                                    ((ww / 2) as f32 - (x / hidpi) as f32),
+                            );
+                            iput.vertical_angle -= Degrees(
+                                MOUSE_SPEED * dt_s *
+                                    ((wh / 2) as f32 - (y / hidpi) as f32),
+                            );
 
                             iput.horizontal_angle = iput.horizontal_angle.normalized();
 
@@ -390,20 +404,38 @@ fn main() {
                                 iput.vertical_angle = threshold.neg();
                             }
 
-                            window.center_cursor().expect("Could not set cursor position");
+                            window.center_cursor().expect(
+                                "Could not set cursor position",
+                            );
                         }
                         WindowEvent::KeyboardInput { input, .. } => {
                             match input {
-                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Up), .. } => {
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Up),
+                                    ..
+                                } => {
                                     iput.position -= direction * SPEED * dt_s;
                                 }
-                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Down), .. } => {
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Down),
+                                    ..
+                                } => {
                                     iput.position += direction * SPEED * dt_s;
                                 }
-                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Left), .. } => {
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Left),
+                                    ..
+                                } => {
                                     iput.position += right * SPEED * dt_s;
                                 }
-                                KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(VirtualKeyCode::Right), .. } => {
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Right),
+                                    ..
+                                } => {
                                     iput.position -= right * SPEED * dt_s;
                                 }
                                 _ => {}
@@ -443,6 +475,18 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let projection_mat = projection.to_homogeneous();
 
+        glyph_brush.queue(Section {
+            text: "Hello, World!",
+            screen_position: (5.0, 5.0),
+            scale: Scale::uniform(32.0),
+            color: [1.0, 1.0, 1.0, 1.0],
+            z: 1.0,
+            ..Default::default()
+        });
+        glyph_brush
+            .draw_queued(&mut encoder, &main_color, &main_depth)
+            .unwrap();
+
         scene
             .render(&mut encoder, view_mat, projection_mat)
             .expect("Could not render scene");
@@ -457,7 +501,7 @@ trait WindowExt {
     fn center_cursor(&self) -> Result<(), ()>;
     fn hide_and_grab_cursor(&self) -> Result<(), String>;
     fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N);
-    fn aspect<N: Default + Div<Output = N> + NumCast + Zero + One>(&self) -> N {
+    fn aspect<N: Default + Div<Output = N> + NumCast + Zero>(&self) -> N {
         let (w, h) = self.windowext_get_inner_size::<N>();
         w / h
     }
@@ -482,6 +526,8 @@ impl WindowExt for winit::Window {
             )
         }
 
-        self.get_inner_size().map(cast_pair).unwrap_or(Default::default())
+        self.get_inner_size().map(cast_pair).unwrap_or(
+            Default::default(),
+        )
     }
 }
