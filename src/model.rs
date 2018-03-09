@@ -118,6 +118,15 @@ impl<R: Resources> Model<R> {
     }
 }
 
+impl<R: Resources> fmt::Debug for Model<R> {
+    fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {
+        fmtr.debug_struct("Model")
+            .field("bundle", &"Bundle(...)")
+            .field("similarity", &self.similarity)
+            .finish()
+    }
+}
+
 #[derive(Debug)]
 pub enum ModelLoadError {
     Obj(LoadObjError),
