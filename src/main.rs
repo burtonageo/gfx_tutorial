@@ -348,22 +348,6 @@ fn main() {
             std::thread::sleep(sleep_time);
         });
 
-        // Hack to get around lack of resize event on MacOS
-        // https://github.com/tomaka/winit/issues/39
-        if cfg!(target_os = "macos") {
-            static mut WINDOW_LAST_W: i32 = 0;
-            static mut WINDOW_LAST_H: i32 = 0;
-            let (w, h) = window.windowext_get_inner_size();
-            unsafe {
-                if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
-                    scene.update_views(&window);
-                    // projection.set_aspect(window.aspect());
-                    WINDOW_LAST_W = w;
-                    WINDOW_LAST_H = h;
-                }
-            }
-        }
-
         events_loop.poll_events(|event| {
             use winit::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
             match event {
@@ -378,7 +362,6 @@ fn main() {
                         .. } => {
                             is_running = false;
                         }
-                        #[cfg(not(target_os = "macos"))]
                         WindowEvent::Resized(..) => {
                             scene.update_views(&window);
                             cam_controller.on_resize(window.window());
