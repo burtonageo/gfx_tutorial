@@ -1,4 +1,4 @@
-use {pipe, ColorFormat, DepthFormat, GLSL_VERT_SRC, GLSL_FRAG_SRC, MAX_LIGHTS, MSL_VERT_SRC,
+use ::{pipe, ColorFormat, DepthFormat, GLSL_VERT_SRC, GLSL_FRAG_SRC, MAX_LIGHTS, MSL_VERT_SRC,
      MSL_FRAG_SRC, ShaderLight, SharedLocals, VertLocals};
 use gfx::{Bundle, CombinedError, CommandBuffer, Encoder, PipelineStateError, Primitive, Resources,
           UpdateError};

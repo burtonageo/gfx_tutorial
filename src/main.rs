@@ -40,18 +40,17 @@ mod controllers;
 mod graphics;
 mod load;
 mod platform;
-mod model;
 mod util;
 
 use ang::{Angle, Degrees};
 use apply::Apply;
 use controllers::camera_controller::CameraController;
-use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
-use gfx_glyph::{FontId, GlyphBrush, GlyphBrushBuilder, Layout, BuiltInLineBreaker, Scale, Section};
+use gfx::{CommandBuffer, Device, Encoder, Resources, UpdateError};
+use gfx_glyph::{FontId, GlyphBrushBuilder, Layout, BuiltInLineBreaker, Scale, Section};
 use graphics::camera::{Camera, CameraMatrices};
 use graphics::fps_counter::FpsCounter;
-use model::Model;
-use na::{Isometry3, Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
+use graphics::model::Model;
+use na::{Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
 use num::{cast, NumCast, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::fs::File;
@@ -109,35 +108,6 @@ const MSL_VERT_SRC: &'static [u8] = include_bytes!("../data/shader/msl/standard.
 const MSL_FRAG_SRC: &'static [u8] = include_bytes!("../data/shader/msl/standard.fs");
 
 const CLEAR_COLOR: [f32; 4] = [0.005, 0.005, 0.1, 1.0];
-
-#[derive(Debug)]
-struct Input {
-    position: Point3<f32>,
-    horizontal_angle: Angle<f32>,
-    vertical_angle: Angle<f32>,
-    fov: Angle<f32>,
-}
-
-impl Input {
-    #[inline]
-    fn new() -> Self {
-        Input {
-            position: Point3::new(0.0, 0.0, 10.0),
-            horizontal_angle: Angle::zero(),
-            vertical_angle: Angle::zero(),
-            fov: Angle::eighth(),
-        }
-    }
-
-    fn direction(&self) -> Vector3<f32> {
-        Vector3::new(
-            self.vertical_angle.cos() * self.horizontal_angle.sin(),
-            self.vertical_angle.sin(),
-            self.vertical_angle.cos() * self.horizontal_angle.cos(),
-        )
-    }
-}
-
 
 const SPEED: f32 = 7.0;
 const MOUSE_SPEED: f32 = 4.0;
@@ -204,9 +174,9 @@ impl<R: Resources> Scene<R> {
         encoder: &mut Encoder<R, CBuf>,
         camera: &CameraController,
     ) -> Result<(), UpdateError<usize>> {
-        let matrices = camera.matrices();
+        let CameraMatrices { view, projection } = camera.matrices();
         for model in &self.models {
-            model.update_matrices(encoder, &matrices.view, &matrices.projection);
+            model.update_matrices(encoder, &view, &projection);
             model.update_lights(encoder, &self.lights)?;
             model.encode(encoder);
         }
