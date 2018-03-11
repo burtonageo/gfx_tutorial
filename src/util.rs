@@ -13,7 +13,6 @@ pub fn get_assets_folder() -> Result<&'static Path, GetAssetsFolderError> {
             let assets_folder = find_folder::Search::ParentsThenKids(2, 2)
                                     .of(bin_folder)
                                     .for_folder("data")?;
-            println!("assets_folder: {:?}", assets_folder);
             Ok(assets_folder)
         };
     }
