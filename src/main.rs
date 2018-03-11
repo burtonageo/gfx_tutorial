@@ -43,8 +43,8 @@ mod util;
 
 use ang::{Angle, Degrees};
 use apply::Apply;
-use gfx::{CommandBuffer, Device, Encoder, Resources, UpdateError};
-use gfx_glyph::{GlyphBrushBuilder, Scale, Section};
+use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
+use gfx_glyph::{FontId, GlyphBrush, GlyphBrushBuilder, Layout, BuiltInLineBreaker, Scale, Section};
 use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
 use num::{cast, NumCast, Zero};
@@ -218,6 +218,106 @@ impl<R: Resources> Scene<R> {
     }
 }
 
+#[derive(Clone)]
+struct Styling {
+    pub screen_position: (f32, f32),
+    pub bounds: (f32, f32),
+    pub scale: Scale,
+    pub color: [f32; 4],
+    pub z: f32,
+    pub layout: Layout<BuiltInLineBreaker>,
+    pub font_id: FontId,
+}
+
+impl Default for Styling {
+    #[inline]
+    fn default() -> Self {
+        Styling {
+            screen_position: Default::default(),
+            bounds: Default::default(),
+            scale: Scale::uniform(1.0),
+            color: Default::default(),
+            z: Default::default(),
+            layout: Default::default(),
+            font_id: Default::default(),
+        }
+    }
+}
+
+impl Styling {
+    fn with_scale(self, scale: f32, window: Option<&winit::Window>) -> Self {
+        let hidpi_scale = window.map(|w| w.hidpi_factor()).unwrap_or(1.0);
+        Styling {
+            scale: Scale::uniform(scale * hidpi_scale),
+            ..self
+        }
+    }
+
+    #[inline]
+    fn to_section<'a>(&self, text: &'a str) -> Section<'a> {
+        Section {
+            text,
+            screen_position: self.screen_position,
+            bounds: self.bounds,
+            scale: self.scale,
+            color: self.color,
+            z: self.z,
+            layout: self.layout,
+            font_id: self.font_id,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct FpsRenderer {
+    show_fps: bool,
+    message_buf: String,
+}
+
+impl FpsRenderer {
+    fn new() -> Self {
+        FpsRenderer {
+            show_fps: true,
+            message_buf: String::with_capacity(12),
+        }
+    }
+
+    fn toggle_show_fps(&mut self) {
+        self.show_fps = !self.show_fps;
+    }
+
+    fn update_fps(&mut self, dt_s: f32) {
+        use std::fmt::Write;
+        self.message_buf.clear();
+        if dt_s != 0.0f32 {
+            write!(self.message_buf, "fps: {:.*}", 2, 1.0 / dt_s).unwrap();
+        } else {
+            self.message_buf.write_str("fps: N/A").unwrap();
+        }
+    }
+
+    fn queue_text<R, F>(
+        &self,
+        styling: &Styling,
+        brush: &mut GlyphBrush<R, F>)
+    where
+        R: Resources,
+        F: Factory<R>,
+    {
+        let section = Section {
+            text: &self.message_buf,
+            screen_position: (5.0, 5.0),
+            scale: Scale::uniform(32.0f32 * 2.0),
+            color: [1.0, 1.0, 1.0, 1.0],
+            ..Default::default()
+        };
+        if self.show_fps {
+            //brush.queue(styling.to_section("Hello, world!"));
+            brush.queue(section);
+        }
+    }
+}
+
 fn main() {
     let mut events_loop = winit::EventsLoop::new();
     let builder = {
@@ -316,11 +416,13 @@ fn main() {
     let mut is_paused = false;
 
     let mut is_running = true;
+    let mut fps = FpsRenderer::new();
 
     while is_running {
         let current = PreciseTime::now();
         let dt = last.to(current);
-        let dt_s = dt.num_nanoseconds().unwrap_or(0) as f32 / 1_000_000_000.0f32;
+        let dt_s = dt.as_seconds();
+        fps.update_fps(dt_s);
         last = current;
 
         defer!({
@@ -438,6 +540,13 @@ fn main() {
                                 } => {
                                     iput.position -= right * SPEED * dt_s;
                                 }
+                                KeyboardInput {
+                                    state: ElementState::Pressed,
+                                    virtual_keycode: Some(VirtualKeyCode::Space),
+                                    ..
+                                } => {
+                                    fps.toggle_show_fps();
+                                }
                                 _ => {}
                             }
                         }
@@ -475,13 +584,13 @@ fn main() {
         let view_mat = view.to_homogeneous();
         let projection_mat = projection.to_homogeneous();
 
-        glyph_brush.queue(Section {
-            text: "Hello, World!",
+        let styling = Styling {
             screen_position: (5.0, 5.0),
             scale: Scale::uniform(32.0f32 * window.hidpi_factor()),
             color: [1.0, 1.0, 1.0, 1.0],
             ..Default::default()
-        });
+        };
+        fps.queue_text(&styling, &mut glyph_brush);
 
         scene
             .render(&mut encoder, view_mat, projection_mat)
@@ -494,6 +603,16 @@ fn main() {
         encoder.flush(&mut device);
         window.swap_buffers().unwrap();
         device.cleanup();
+    }
+}
+
+trait GetSeconds {
+    fn as_seconds(&self) -> f32;
+}
+
+impl GetSeconds for Duration {
+    fn as_seconds(&self) -> f32 {
+        self.num_nanoseconds().unwrap_or(0) as f32 / 1_000_000_000.0f32
     }
 }
 
