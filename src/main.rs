@@ -36,6 +36,8 @@ extern crate gfx_window_dxgi;
 #[cfg(all(target_os = "windows", feature = "dx11"))]
 extern crate gfx_device_dx11;
 
+mod controllers;
+mod graphics;
 mod load;
 mod platform;
 mod model;
@@ -43,8 +45,11 @@ mod util;
 
 use ang::{Angle, Degrees};
 use apply::Apply;
+use controllers::camera_controller::CameraController;
 use gfx::{CommandBuffer, Device, Encoder, Factory, Resources, UpdateError};
 use gfx_glyph::{FontId, GlyphBrush, GlyphBrushBuilder, Layout, BuiltInLineBreaker, Scale, Section};
+use graphics::camera::{Camera, CameraMatrices};
+use graphics::fps_counter::FpsCounter;
 use model::Model;
 use na::{Isometry3, Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
 use num::{cast, NumCast, Zero};
@@ -123,25 +128,16 @@ impl Input {
             fov: Angle::eighth(),
         }
     }
-}
 
-// #[allow(dead_code)]
-#[derive(Debug)]
-struct Camera {
-    perspective: Perspective3<f32>,
-    view: Isometry3<f32>,
-}
-
-#[allow(dead_code)]
-impl Camera {
-    #[inline]
-    fn matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
-        (
-            self.perspective.to_homogeneous(),
-            self.view.to_homogeneous(),
+    fn direction(&self) -> Vector3<f32> {
+        Vector3::new(
+            self.vertical_angle.cos() * self.horizontal_angle.sin(),
+            self.vertical_angle.sin(),
+            self.vertical_angle.cos() * self.horizontal_angle.cos(),
         )
     }
 }
+
 
 const SPEED: f32 = 7.0;
 const MOUSE_SPEED: f32 = 4.0;
@@ -203,14 +199,14 @@ impl<R: Resources> Scene<R> {
         }
     }
 
-    fn render<C: CommandBuffer<R>>(
+    fn render<CBuf: CommandBuffer<R>>(
         &self,
-        encoder: &mut Encoder<R, C>,
-        view_matrix: Matrix4<f32>,
-        projection_matrix: Matrix4<f32>,
+        encoder: &mut Encoder<R, CBuf>,
+        camera: &CameraController,
     ) -> Result<(), UpdateError<usize>> {
+        let matrices = camera.matrices();
         for model in &self.models {
-            model.update_matrices(encoder, &view_matrix, &projection_matrix);
+            model.update_matrices(encoder, &matrices.view, &matrices.projection);
             model.update_lights(encoder, &self.lights)?;
             model.encode(encoder);
         }
@@ -264,56 +260,6 @@ impl Styling {
             z: self.z,
             layout: self.layout,
             font_id: self.font_id,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct FpsRenderer {
-    show_fps: bool,
-    message_buf: String,
-}
-
-impl FpsRenderer {
-    fn new() -> Self {
-        FpsRenderer {
-            show_fps: true,
-            message_buf: String::with_capacity(12),
-        }
-    }
-
-    fn toggle_show_fps(&mut self) {
-        self.show_fps = !self.show_fps;
-    }
-
-    fn update_fps(&mut self, dt_s: f32) {
-        use std::fmt::Write;
-        self.message_buf.clear();
-        if dt_s != 0.0f32 {
-            write!(self.message_buf, "fps: {:.*}", 2, 1.0 / dt_s).unwrap();
-        } else {
-            self.message_buf.write_str("fps: N/A").unwrap();
-        }
-    }
-
-    fn queue_text<R, F>(
-        &self,
-        styling: &Styling,
-        brush: &mut GlyphBrush<R, F>)
-    where
-        R: Resources,
-        F: Factory<R>,
-    {
-        let section = Section {
-            text: &self.message_buf,
-            screen_position: (5.0, 5.0),
-            scale: Scale::uniform(32.0f32 * 2.0),
-            color: [1.0, 1.0, 1.0, 1.0],
-            ..Default::default()
-        };
-        if self.show_fps {
-            //brush.queue(styling.to_section("Hello, world!"));
-            brush.queue(section);
         }
     }
 }
@@ -410,13 +356,12 @@ fn main() {
         Scene::new(lights, models)
     };
 
-    let mut iput = Input::new();
-    let mut projection = Perspective3::new(window.aspect(), iput.fov.in_radians(), 0.1, 100.0);
+    let mut cam_controller = CameraController::new(window.window(), MOUSE_SPEED);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
 
     let mut is_running = true;
-    let mut fps = FpsRenderer::new();
+    let mut fps = FpsCounter::new();
 
     while is_running {
         let current = PreciseTime::now();
@@ -434,18 +379,6 @@ fn main() {
             std::thread::sleep(sleep_time);
         });
 
-        let direction = Vector3::new(
-            iput.vertical_angle.cos() * iput.horizontal_angle.sin(),
-            iput.vertical_angle.sin(),
-            iput.vertical_angle.cos() * iput.horizontal_angle.cos(),
-        );
-
-        let right = Vector3::new(
-            (iput.horizontal_angle - Angle::quarter()).sin(),
-            na::zero(),
-            (iput.horizontal_angle - Angle::quarter()).cos(),
-        );
-
         // Hack to get around lack of resize event on MacOS
         // https://github.com/tomaka/winit/issues/39
         if cfg!(target_os = "macos") {
@@ -455,7 +388,7 @@ fn main() {
             unsafe {
                 if w != WINDOW_LAST_W || h != WINDOW_LAST_H {
                     scene.update_views(&window);
-                    projection.set_aspect(window.aspect());
+                    // projection.set_aspect(window.aspect());
                     WINDOW_LAST_W = w;
                     WINDOW_LAST_H = h;
                 }
@@ -479,66 +412,58 @@ fn main() {
                         #[cfg(not(target_os = "macos"))]
                         WindowEvent::Resized(..) => {
                             scene.update_views(&window);
-                            projection.set_aspect(window.aspect());
+                            cam_controller.on_resize(window.window());
                         }
                         WindowEvent::CursorMoved { position: (x, y), .. } => {
                             let (ww, wh) = window.windowext_get_inner_size::<i32>();
                             let hidpi = window.hidpi_factor() as f64;
 
-                            iput.horizontal_angle += Degrees(
+                            let h = Degrees(
                                 MOUSE_SPEED * dt_s *
                                     ((ww / 2) as f32 - (x / hidpi) as f32),
                             );
-                            iput.vertical_angle -= Degrees(
+                            let v = Degrees(
                                 MOUSE_SPEED * dt_s *
                                     ((wh / 2) as f32 - (y / hidpi) as f32),
                             );
 
-                            iput.horizontal_angle = iput.horizontal_angle.normalized();
-
-                            let threshold = Angle::quarter() - Degrees(1.0f32);
-
-                            if iput.vertical_angle > threshold {
-                                iput.vertical_angle = threshold;
-                            }
-
-                            if iput.vertical_angle < threshold.neg() {
-                                iput.vertical_angle = threshold.neg();
-                            }
+                            cam_controller.rotate_view_angles_by(h, v);
 
                             window.center_cursor().expect(
                                 "Could not set cursor position",
                             );
                         }
                         WindowEvent::KeyboardInput { input, .. } => {
+                            let right = cam_controller.right();
+                            let direction = cam_controller.direction();
                             match input {
                                 KeyboardInput {
                                     state: ElementState::Pressed,
                                     virtual_keycode: Some(VirtualKeyCode::Up),
                                     ..
                                 } => {
-                                    iput.position -= direction * SPEED * dt_s;
+                                    cam_controller.position -= direction * SPEED * dt_s;
                                 }
                                 KeyboardInput {
                                     state: ElementState::Pressed,
                                     virtual_keycode: Some(VirtualKeyCode::Down),
                                     ..
                                 } => {
-                                    iput.position += direction * SPEED * dt_s;
+                                    cam_controller.position += direction * SPEED * dt_s;
                                 }
                                 KeyboardInput {
                                     state: ElementState::Pressed,
                                     virtual_keycode: Some(VirtualKeyCode::Left),
                                     ..
                                 } => {
-                                    iput.position += right * SPEED * dt_s;
+                                    cam_controller.position += right * SPEED * dt_s;
                                 }
                                 KeyboardInput {
                                     state: ElementState::Pressed,
                                     virtual_keycode: Some(VirtualKeyCode::Right),
                                     ..
                                 } => {
-                                    iput.position -= right * SPEED * dt_s;
+                                    cam_controller.position -= right * SPEED * dt_s;
                                 }
                                 KeyboardInput {
                                     state: ElementState::Pressed,
@@ -569,20 +494,8 @@ fn main() {
             model.similarity.append_rotation_mut(&rot);
         }
 
-        let view = {
-            let up = right.cross(&direction);
-            Isometry3::look_at_lh(
-                &iput.position,
-                &Point::from_coordinates(iput.position.coords + direction),
-                &up,
-            )
-        };
-
         encoder.clear(&main_color, CLEAR_COLOR);
         encoder.clear_depth(&main_depth, 1.0);
-
-        let view_mat = view.to_homogeneous();
-        let projection_mat = projection.to_homogeneous();
 
         let styling = Styling {
             screen_position: (5.0, 5.0),
@@ -593,7 +506,7 @@ fn main() {
         fps.queue_text(&styling, &mut glyph_brush);
 
         scene
-            .render(&mut encoder, view_mat, projection_mat)
+            .render(&mut encoder, &cam_controller)
             .expect("Could not render scene");
 
         glyph_brush
@@ -616,7 +529,7 @@ impl GetSeconds for Duration {
     }
 }
 
-trait WindowExt {
+pub trait WindowExt {
     fn center_cursor(&self) -> Result<(), ()>;
     fn hide_and_grab_cursor(&self) -> Result<(), String>;
     fn windowext_get_inner_size<N: NumCast + Zero + Default>(&self) -> (N, N);
