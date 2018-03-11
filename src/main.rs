@@ -42,7 +42,7 @@ mod load;
 mod platform;
 mod util;
 
-use ang::{Angle, Degrees};
+use ang::Degrees;
 use apply::Apply;
 use controllers::camera_controller::CameraController;
 use gfx::{CommandBuffer, Device, Encoder, Resources, UpdateError};
@@ -50,7 +50,7 @@ use gfx_glyph::{FontId, GlyphBrushBuilder, Layout, BuiltInLineBreaker, Scale, Se
 use graphics::camera::{Camera, CameraMatrices};
 use graphics::fps_counter::FpsCounter;
 use graphics::model::Model;
-use na::{Matrix4, Perspective3, Point3, Point, UnitQuaternion, Vector3};
+use na::{Point3, Point, UnitQuaternion, Vector3};
 use num::{cast, NumCast, Zero};
 use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::fs::File;
