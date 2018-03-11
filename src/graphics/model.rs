@@ -5,9 +5,9 @@ use gfx::{Bundle, CombinedError, CommandBuffer, Encoder, PipelineStateError, Pri
 use gfx::handle::{DepthStencilView, RenderTargetView};
 use gfx::state::Rasterizer;
 use gfx::texture::{AaMode, Kind, Mipmap};
+use graphics::load::{load_obj, LoadObjError};
 use graphics::platform::{Backend, FactoryExt, WindowExt};
 use image::{self, ImageError};
-use load::{load_obj, LoadObjError};
 use na::{Matrix4, Similarity3};
 use std::error::Error;
 use std::fmt;

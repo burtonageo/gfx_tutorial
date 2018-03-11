@@ -38,7 +38,6 @@ extern crate gfx_device_dx11;
 
 mod controllers;
 mod graphics;
-mod load;
 mod util;
 
 use ang::Degrees;
