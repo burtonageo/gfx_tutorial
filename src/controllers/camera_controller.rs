@@ -80,7 +80,6 @@ impl Camera for CameraController {
     fn matrices(&self) -> CameraMatrices {
         let view = {
             let direction = self.direction();
-            let right = self.right();
             let up = self.up();
 
             Isometry3::look_at_lh(

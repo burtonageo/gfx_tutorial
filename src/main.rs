@@ -39,7 +39,6 @@ extern crate gfx_device_dx11;
 mod controllers;
 mod graphics;
 mod load;
-mod platform;
 mod util;
 
 use ang::Degrees;
@@ -50,12 +49,12 @@ use gfx_glyph::{FontId, GlyphBrushBuilder, Layout, BuiltInLineBreaker, Scale, Se
 use graphics::camera::{Camera, CameraMatrices};
 use graphics::fps_counter::FpsCounter;
 use graphics::model::Model;
-use na::{Point3, Point, UnitQuaternion, Vector3};
+use graphics::platform::{self, ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
+use na::{Point3, UnitQuaternion};
 use num::{cast, NumCast, Zero};
-use platform::{ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use std::fs::File;
 use std::io::Read;
-use std::ops::{Div, Neg};
+use std::ops::Div;
 use std::time::Duration as StdDuration;
 use time::{Duration, PreciseTime};
 
@@ -261,13 +260,13 @@ fn main() {
 
     let mut encoder = factory.create_encoder();
 
-    let fonts = [
+    const FONTS: &[&str] = &[
         "NotoSans-Bold.ttf",
         "NotoSans-BoldItalic.ttf",
         "NotoSans-Italic.ttf",
         "NotoSans-Regular.ttf",
     ];
-    let mut glyph_brush = fonts
+    let mut glyph_brush = FONTS
         .iter()
         .map(|p| {
             util::get_assets_folder()
