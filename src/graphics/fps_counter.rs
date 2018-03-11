@@ -34,7 +34,7 @@ impl FpsCounter {
 
     pub fn queue_text<R, F>(
         &self,
-        styling: &Styling,
+        _styling: &Styling,
         brush: &mut GlyphBrush<R, F>)
     where
         R: Resources,

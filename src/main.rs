@@ -182,8 +182,8 @@ impl<R: Resources> Scene<R> {
     }
 }
 
-#[derive(Clone)]
-struct Styling {
+#[derive(Clone, Debug)]
+pub struct Styling {
     pub screen_position: (f32, f32),
     pub bounds: (f32, f32),
     pub scale: Scale,
@@ -208,6 +208,7 @@ impl Default for Styling {
     }
 }
 
+#[allow(dead_code)]
 impl Styling {
     fn with_scale(self, scale: f32, window: Option<&winit::Window>) -> Self {
         let hidpi_scale = window.map(|w| w.hidpi_factor()).unwrap_or(1.0);
