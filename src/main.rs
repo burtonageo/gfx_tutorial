@@ -51,6 +51,7 @@ use graphics::model::Model;
 use graphics::platform::{self, ContextBuilder, FactoryExt as PlFactoryExt, WindowExt as PlatformWindow};
 use na::{Point3, UnitQuaternion};
 use num::{cast, NumCast, Zero};
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Read;
 use std::ops::Div;
@@ -111,7 +112,7 @@ const SPEED: f32 = 7.0;
 const MOUSE_SPEED: f32 = 4.0;
 
 #[derive(Clone, Debug, PartialEq)]
-struct Light {
+pub struct Light {
     position: Point3<f32>,
     color: [f32; 4],
     power: f32,
@@ -135,9 +136,10 @@ impl Default for Light {
     }
 }
 
-impl From<Light> for ShaderLight {
+impl<L: Borrow<Light>> From<L> for ShaderLight {
     #[inline]
-    fn from(l: Light) -> Self {
+    fn from(l: L) -> Self {
+        let l = l.borrow();
         let na::coordinates::XYZ { x, y, z } = *l.position;
         ShaderLight {
             pos: [x, y, z],
@@ -319,7 +321,7 @@ fn main() {
             let l3 = Light::new(Point3::new(1.5, -3.0, 0.0), [1.0, 0.0, 1.0, 0.3], 300.0);
             let l4 = Light::new(Point3::new(0.0, -1.8, 0.0), [1.0, 0.0, 1.0, 1.0], 400.0);
 
-            vec![l1, l2, l3, l4].into_iter().map(Into::into).collect()
+            [l1, l2, l3, l4].iter().map(Into::into).collect()
         };
 
         Scene::new(lights, models)
