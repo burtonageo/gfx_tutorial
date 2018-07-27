@@ -149,11 +149,11 @@ impl Ord for PackedObjVertex {
 
 impl PackedObjVertex {
     #[inline]
-    fn new(p: obj::Vertex, t: obj::TVertex, n: obj::Normal) -> Self {
+    fn new(pos: obj::Vertex, uv: obj::TVertex, norm: obj::Normal) -> Self {
         PackedObjVertex {
-            pos: p,
-            uv: t,
-            norm: n,
+            pos,
+            uv,
+            norm,
         }
     }
 }

@@ -8,6 +8,7 @@ use gfx::texture::{AaMode, Kind, Mipmap};
 use graphics::load::{load_obj, LoadObjError};
 use graphics::platform::{Backend, FactoryExt, WindowExt};
 use image::{self, ImageError};
+use lazy_load::Asset;
 use na::{Matrix4, Similarity3};
 use std::error::Error;
 use std::fmt;
@@ -117,6 +118,28 @@ impl<R: Resources> Model<R> {
         window.update_views(&mut self.bundle.data.out, &mut self.bundle.data.main_depth);
     }
 }
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct ModelLoadParams<'a, R: Resources + 'a, F: FactoryExt<R> + 'a> {
+    factory: &'a mut F,
+    backend: &'a Backend,
+    rtv: RenderTargetView<R, ColorFormat>,
+    dsv: DepthStencilView<R, DepthFormat>,
+    model_name: &'a str,
+    texture_name: &'a str,
+}
+
+/*
+impl<'a, R: Resources + 'a, F: FactoryExt<R>> Asset<LoadParams = ModelLoadParams<'a, R, F>> for Model<R> {
+    type LoadParams = ModelLoadParams<'a, R, F>;
+    type LoadError = ModelLoadError;
+    #[allow(unused_variables)]
+    fn load(params: Self::LoadParams) -> Result<Self, Self::LoadError> {
+        Model::load(params.factory, params.backend, params.rtv, params.dsv, params.model_name, params.texture_name).map_err(Box::new)
+    }
+}
+*/
 
 impl<R: Resources> fmt::Debug for Model<R> {
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> fmt::Result {

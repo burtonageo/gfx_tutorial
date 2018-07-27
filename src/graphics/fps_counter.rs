@@ -13,7 +13,9 @@ impl FpsCounter {
     pub fn new() -> Self {
         FpsCounter {
             show_fps: true,
-            message_buf: String::with_capacity(12),
+            // 1 2 3 4 5 6 7 8
+            // f p s : x . y y
+            message_buf: String::with_capacity(8),
         }
     }
 
@@ -48,7 +50,6 @@ impl FpsCounter {
             ..Default::default()
         };
         if self.show_fps {
-            //brush.queue(styling.to_section("Hello, world!"));
             brush.queue(section);
         }
     }

@@ -7,30 +7,46 @@ use std::ops::Neg;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CameraController {
-    pub position: Point3<f32>,
+    pub input: PlayerInput,
+    position: Point3<f32>,
     horizontal_angle: Angle<f32>,
     vertical_angle: Angle<f32>,
     fov: Angle<f32>,
     perspective: Perspective3<f32>,
     mouse_speed: f32,
+    move_speed: f32,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PlayerInput {
+    pub moving_forwards: bool,
+    pub moving_backwards: bool,
+    pub moving_left: bool,
+    pub moving_right: bool,
+    pub moving_up: bool,
+    pub moving_down: bool,
 }
 
 impl CameraController {
     pub fn new<W: WindowExt>(
         window: &W,
         mouse_speed: f32,
+        move_speed: f32,
     ) -> Self {
         let fov = Angle::eighth();
         CameraController {
+            input: Default::default(),
             position: Point3::new(0.0, 0.0, 10.0),
             horizontal_angle: Angle::zero(),
             vertical_angle: Angle::zero(),
             fov,
             perspective: Perspective3::new(window.aspect(), fov.in_radians(), 0.1, 100.0),
             mouse_speed,
+            move_speed,
         }
     }
 
+    #[inline]
     pub fn on_resize<W: WindowExt>(&mut self, window: &W) {
         self.perspective.set_aspect(window.aspect());
     }
@@ -58,7 +74,10 @@ impl CameraController {
         self.right().cross(&self.direction())
     }
 
-    pub fn rotate_view_angles_by(&mut self, delta_h: Angle<f32>, delta_v: Angle<f32>) {
+    pub fn on_cursor_moved(&mut self, dt_s: f32, (x, y): (f64, f64), (win_w, win_h): (i32, i32), hidpi: f32) {
+        let delta_h = Degrees(self.mouse_speed * dt_s * ((win_w / 2) as f32 - (x as f32 / hidpi)));
+        let delta_v = Degrees(self.mouse_speed * dt_s * ((win_h / 2) as f32 - (y as f32 / hidpi)));
+
         self.horizontal_angle += delta_h;
         self.vertical_angle -= delta_v;
 
@@ -72,6 +91,30 @@ impl CameraController {
 
         if self.vertical_angle < threshold.neg() {
             self.vertical_angle = threshold.neg();
+        }
+    }
+
+    pub fn apply_input(&mut self, dt_s: f32) {
+        let direction = self.direction();
+        let right = self.right();
+        let up =Vector3::new(0.0, 1.0, 0.0);
+        if self.input.moving_forwards {
+            self.position -= direction * self.move_speed * dt_s;
+        }
+        if self.input.moving_backwards {
+            self.position += direction * self.move_speed * dt_s;
+        }
+        if self.input.moving_left {
+            self.position += right * self.move_speed * dt_s;
+        }
+        if self.input.moving_right {
+            self.position -= right * self.move_speed * dt_s;
+        }
+        if self.input.moving_up {
+            self.position += up * self.move_speed * dt_s;
+        }
+        if self.input.moving_down {
+            self.position -= up * self.move_speed * dt_s;
         }
     }
 }
@@ -89,9 +132,6 @@ impl Camera for CameraController {
             )
         };
 
-        CameraMatrices {
-            view: view.to_homogeneous(),
-            projection: self.perspective.to_homogeneous(),
-        }
+        CameraMatrices::new(view.to_homogeneous(), self.perspective.to_homogeneous())
     }
 }

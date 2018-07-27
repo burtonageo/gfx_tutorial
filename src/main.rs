@@ -37,6 +37,7 @@ extern crate gfx_window_dxgi;
 extern crate gfx_device_dx11;
 
 mod controllers;
+mod lazy_load;
 mod graphics;
 mod util;
 
@@ -169,10 +170,10 @@ impl<R: Resources> Scene<R> {
         }
     }
 
-    fn render<CBuf: CommandBuffer<R>>(
+    fn render<CBuf: CommandBuffer<R>, Cam: Camera>(
         &self,
         encoder: &mut Encoder<R, CBuf>,
-        camera: &CameraController,
+        camera: &Cam,
     ) -> Result<(), UpdateError<usize>> {
         let CameraMatrices { view, projection } = camera.matrices();
         for model in &self.models {
@@ -309,10 +310,22 @@ fn main() {
                 "img/checker.png",
             ).expect("Could not load model");
 
+            /*
+            let mut floor_model = Model::load(
+                &mut factory,
+                &backend,
+                main_color.clone(),
+                main_depth.clone(),
+                "floor",
+                "img/checker.png",
+            ).expect("Could not load model");
+            */
+
             monkey_model.similarity.isometry.translation.vector[1] += 2.0f32;
             cube_model.similarity.isometry.translation.vector[1] -= 2.0f32;
+            //floor_model.similarity.isometry.translation.vector[1] -= 6.0f32;
 
-            vec![monkey_model, cube_model]
+            vec![monkey_model, cube_model, /* floor_model */]
         };
 
         let lights: Vec<ShaderLight> = {
@@ -327,7 +340,7 @@ fn main() {
         Scene::new(lights, models)
     };
 
-    let mut cam_controller = CameraController::new(window.window(), MOUSE_SPEED);
+    let mut cam_controller = CameraController::new(window.window(), MOUSE_SPEED, SPEED);
     let mut last = PreciseTime::now();
     let mut is_paused = false;
 
@@ -370,61 +383,30 @@ fn main() {
                         }
                         WindowEvent::CursorMoved { position: (x, y), .. } => {
                             let (ww, wh) = window.windowext_get_inner_size::<i32>();
-                            let hidpi = window.hidpi_factor() as f64;
-
-                            let h = Degrees(
-                                MOUSE_SPEED * dt_s *
-                                    ((ww / 2) as f32 - (x / hidpi) as f32),
-                            );
-                            let v = Degrees(
-                                MOUSE_SPEED * dt_s *
-                                    ((wh / 2) as f32 - (y / hidpi) as f32),
-                            );
-
-                            cam_controller.rotate_view_angles_by(h, v);
-
+                            let hidpi = window.hidpi_factor();
+                            cam_controller.on_cursor_moved(dt_s, (x, y), (ww, wh), hidpi);
                             window.center_cursor().expect(
                                 "Could not set cursor position",
                             );
                         }
                         WindowEvent::KeyboardInput { input, .. } => {
-                            let right = cam_controller.right();
-                            let direction = cam_controller.direction();
                             match input {
                                 KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Up),
+                                    state,
+                                    virtual_keycode: Some(vk_code),
                                     ..
                                 } => {
-                                    cam_controller.position -= direction * SPEED * dt_s;
-                                }
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Down),
-                                    ..
-                                } => {
-                                    cam_controller.position += direction * SPEED * dt_s;
-                                }
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Left),
-                                    ..
-                                } => {
-                                    cam_controller.position += right * SPEED * dt_s;
-                                }
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Right),
-                                    ..
-                                } => {
-                                    cam_controller.position -= right * SPEED * dt_s;
-                                }
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Space),
-                                    ..
-                                } => {
-                                    fps.toggle_show_fps();
+                                    let is_pressed = state == ElementState::Pressed;
+                                    match vk_code {
+                                        VirtualKeyCode::Up | VirtualKeyCode::W => cam_controller.input.moving_forwards = is_pressed,
+                                        VirtualKeyCode::Down | VirtualKeyCode::S => cam_controller.input.moving_backwards = is_pressed,
+                                        VirtualKeyCode::Left | VirtualKeyCode::A => cam_controller.input.moving_left = is_pressed,
+                                        VirtualKeyCode::Right | VirtualKeyCode::D => cam_controller.input.moving_right = is_pressed,
+                                        VirtualKeyCode::E => cam_controller.input.moving_up = is_pressed,
+                                        VirtualKeyCode::Q => cam_controller.input.moving_down = is_pressed, 
+                                        VirtualKeyCode::Space if is_pressed => fps.toggle_show_fps(),
+                                        _ => {}
+                                    }
                                 }
                                 _ => {}
                             }
@@ -438,6 +420,8 @@ fn main() {
                 _ => (),
             }
         });
+
+        cam_controller.apply_input(dt_s);
 
         if is_paused {
             continue;
